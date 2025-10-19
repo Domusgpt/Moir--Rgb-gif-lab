@@ -12,9 +12,12 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const imageModel = 'gemini-2.5-flash-image';
 
 export interface AnimationAssets {
+  sourceImageId: string;
+  sourceImageName?: string;
   imageData: { data: string, mimeType: string };
-  frames: Frame[];
+  frameCount: number;
   frameDuration: number;
+  isLooping: boolean;
 }
 
 const base64ToGenerativePart = (base64: string, mimeType: string) => {
@@ -30,7 +33,8 @@ export const generateAnimationAssets = async (
     base64UserImage: string | null,
     mimeType: string | null,
     imagePrompt: string,
-    onProgress: (message: string) => void
+    sourceImageId: string,
+    isLooping: boolean
 ): Promise<AnimationAssets | null> => {
   try {
     const imageGenTextPart = { text: imagePrompt };
@@ -66,26 +70,28 @@ export const generateAnimationAssets = async (
     }
     const imageData = { data: imagePart.inlineData.data, mimeType: imagePart.inlineData.mimeType };
     
-    // Extract and parse frame duration from the text part
+    // Extract and parse frame duration and count from the text part
     let frameDuration = 120; // Default fallback value
+    let frameCount = 9; // Default fallback value
     const textPart = responseParts.find(p => p.text);
     if (textPart?.text) {
         try {
-            // The model might return just the JSON, or text with JSON embedded.
-            // A simple regex to find a JSON-like string.
             const jsonStringMatch = textPart.text.match(/{.*}/s);
             if (jsonStringMatch) {
                 const parsed = JSON.parse(jsonStringMatch[0]);
                 if (parsed.frameDuration && typeof parsed.frameDuration === 'number') {
                     frameDuration = parsed.frameDuration;
                 }
+                if (parsed.frameCount && typeof parsed.frameCount === 'number') {
+                  frameCount = parsed.frameCount;
+              }
             }
         } catch (e) {
-            console.warn("Could not parse frame duration from model response. Using default.", e);
+            console.warn("Could not parse animation data from model response. Using defaults.", e);
         }
     }
 
-    return { imageData, frames: [], frameDuration };
+    return { sourceImageId, imageData, frameCount, frameDuration, isLooping };
   } catch (error) {
     console.error("Error during asset generation:", error);
     throw new Error(`Failed to process image. ${error instanceof Error ? error.message : ''}`);

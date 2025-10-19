@@ -8,19 +8,13 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AnimationAssets } from '../services/geminiService';
 import { Frame } from '../types';
 import BananaLoader from './BananaLoader';
-import { InfoIcon, XCircleIcon, SettingsIcon, ArrowLeftIcon } from './icons';
+import { InfoIcon, XCircleIcon, SettingsIcon, DownloadIcon, ArrowLeftIcon } from './icons';
 
 // Add declaration for the gifshot library loaded from CDN
 declare var gifshot: any;
 
-// --- DEBUG FLAG ---
-// Set to `true` to disable the share button for testing layout.
-const DISABLE_SHARE_BUTTON = false;
-
-// FIX: Corrected a malformed and duplicated interface definition due to a copy-paste error.
 interface AnimationPlayerProps {
   assets: AnimationAssets;
-  onRegenerate: () => void;
   onBack: () => void;
   fileName: string;
 }
@@ -90,11 +84,67 @@ const ControlSlider: React.FC<{
     </div>
 );
 
-const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onRegenerate, onBack, fileName }) => {
+
+type ExportFormat = 'gif' | 'video';
+type GifQuality = 'low' | 'medium' | 'high';
+
+interface ExportModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onStartExport: (format: ExportFormat, quality: GifQuality) => void;
+}
+
+const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, onStartExport }) => {
+    const [format, setFormat] = useState<ExportFormat>('gif');
+    const [quality, setQuality] = useState<GifQuality>('medium');
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
+            <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center">
+                    <h2 className="text-xl font-bold text-white">Export Options</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white">
+                        <XCircleIcon className="w-6 h-6" />
+                    </button>
+                </div>
+                
+                <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-300">Format</label>
+                    <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => setFormat('gif')} className={`p-2 rounded-md text-center ${format === 'gif' ? 'bg-indigo-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>GIF</button>
+                        <button onClick={() => setFormat('video')} className={`p-2 rounded-md text-center ${format === 'video' ? 'bg-indigo-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>Video</button>
+                    </div>
+                </div>
+
+                <div className={`space-y-2 transition-opacity ${format === 'gif' ? 'opacity-100' : 'opacity-50'}`}>
+                    <label className="block text-sm font-medium text-gray-300">Quality (GIF only)</label>
+                     <div className="grid grid-cols-3 gap-2">
+                        <button onClick={() => setQuality('low')} disabled={format !== 'gif'} className={`p-2 rounded-md text-center ${quality === 'low' ? 'bg-indigo-600 text-white' : 'bg-gray-700 hover:bg-gray-600'} disabled:cursor-not-allowed`}>Low</button>
+                        <button onClick={() => setQuality('medium')} disabled={format !== 'gif'} className={`p-2 rounded-md text-center ${quality === 'medium' ? 'bg-indigo-600 text-white' : 'bg-gray-700 hover:bg-gray-600'} disabled:cursor-not-allowed`}>Medium</button>
+                        <button onClick={() => setQuality('high')} disabled={format !== 'gif'} className={`p-2 rounded-md text-center ${quality === 'high' ? 'bg-indigo-600 text-white' : 'bg-gray-700 hover:bg-gray-600'} disabled:cursor-not-allowed`}>High</button>
+                    </div>
+                    <p className="text-xs text-gray-400">Low quality results in a smaller file size.</p>
+                </div>
+                
+                <button 
+                  onClick={() => onStartExport(format, quality)} 
+                  className="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-500 transition-colors duration-200 flex items-center justify-center"
+                >
+                  <DownloadIcon className="w-5 h-5 mr-2" />
+                  Start Export
+                </button>
+            </div>
+        </div>
+    );
+};
+
+
+const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileName }) => {
   const [frames, setFrames] = useState<HTMLImageElement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [showControls, setShowControls] = useState(false);
   const [config, setConfig] = useState<AnimationConfig>({
@@ -104,28 +154,45 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onRegenerate,
   const [viewMode, setViewMode] = useState<'animation' | 'spritesheet'>('animation');
   const animationFrameId = useRef<number | null>(null);
   const animationStartTimeRef = useRef<number>(0);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   
   const [spriteSheetImage, setSpriteSheetImage] = useState<HTMLImageElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const [displayFrames, setDisplayFrames] = useState<Frame[]>([]);
-  const [pendingAction, setPendingAction] = useState<'export' | 'share' | null>(null);
-
-  const isShareAvailable = typeof navigator !== 'undefined' && navigator.share && !DISABLE_SHARE_BUTTON;
-
-  const processSpriteSheet = useCallback((img: HTMLImageElement, frameLayout: Frame[]) => {
-    if (!frameLayout || frameLayout.length === 0) {
-        console.error("processSpriteSheet called with no frame layout.");
-        setFrames([]);
+  
+  const processSpriteSheet = useCallback((img: HTMLImageElement, frameCount: number) => {
+    const gridSize = Math.sqrt(frameCount);
+    if (!Number.isInteger(gridSize)) {
+        console.error(`Invalid frame count for square grid: ${frameCount}`);
         setIsLoading(false);
         return;
     }
 
+    const { naturalWidth, naturalHeight } = img;
+    const frameWidth = Math.floor(naturalWidth / gridSize);
+    const frameHeight = Math.floor(naturalHeight / gridSize);
+    const frameLayout: Frame[] = [];
+    const cropAmount = 10; // Crop a bit to remove potential grid line artifacts
+
+    for (let i = 0; i < frameCount; i++) {
+        const row = Math.floor(i / gridSize);
+        const col = i % gridSize;
+        const initialX = col * frameWidth;
+        const initialY = row * frameHeight;
+        frameLayout.push({ 
+            x: initialX + cropAmount, 
+            y: initialY + cropAmount, 
+            width: frameWidth - (cropAmount * 2), 
+            height: frameHeight - (cropAmount * 2) 
+        });
+    }
+
+    setDisplayFrames(frameLayout);
+
     const framePromises: Promise<HTMLImageElement>[] = frameLayout.map(frame => {
       return new Promise((resolve, reject) => {
         if (frame.width <= 0 || frame.height <= 0) {
-            console.error("Invalid frame dimensions for slicing:", frame);
-            // Resolve with a 1x1 transparent pixel to avoid breaking Promise.all
             const emptyImage = new Image();
             emptyImage.onload = () => resolve(emptyImage);
             emptyImage.src = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
@@ -153,94 +220,122 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onRegenerate,
         setIsLoading(false);
     });
   }, []);
-  
-  const performExport = useCallback(() => {
-    if (frames.length === 0 || !canvasRef.current) return;
-    setIsExporting(true);
 
-    const imageUrls = frames.map(frame => frame.src);
-    const intervalInSeconds = config.speed / 1000;
-    const gifWidth = canvasRef.current.width;
-    const gifHeight = canvasRef.current.height;
+    const performGifExport = useCallback((quality: GifQuality) => {
+        if (frames.length === 0 || !canvasRef.current) return;
+        setIsExporting(true);
 
-    gifshot.createGIF({
-        images: imageUrls,
-        gifWidth: gifWidth,
-        gifHeight: gifHeight,
-        interval: intervalInSeconds,
-        numWorkers: 2,
-    }, (obj: { error: boolean; image: string; errorMsg: string }) => {
-        setIsExporting(false);
-        if (!obj.error) {
-            const a = document.createElement('a');
-            a.href = obj.image;
-            a.download = `${fileName}.gif`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        } else {
-            console.error('GIF export failed:', obj.errorMsg);
-        }
-    });
-  }, [frames, config.speed, fileName]);
+        const qualitySettings = {
+            low: { sampleInterval: 20, numWorkers: 2 },
+            medium: { sampleInterval: 10, numWorkers: 4 },
+            high: { sampleInterval: 1, numWorkers: 4 },
+        };
 
-  const performShare = useCallback(async () => {
-    if (!isShareAvailable || frames.length === 0 || !canvasRef.current) return;
-    setIsSharing(true);
+        const imageUrls = frames.map(frame => frame.src);
+        const intervalInSeconds = config.speed / 1000;
 
-    const imageUrls = frames.map(frame => frame.src);
-    // gifshot `interval` is in seconds, so divide ms by 1000.
-    const intervalInSeconds = config.speed / 1000;
-
-    gifshot.createGIF({
-        images: imageUrls,
-        gifWidth: canvasRef.current.width,
-        gifHeight: canvasRef.current.height,
-        interval: intervalInSeconds,
-        numWorkers: 2,
-    }, async (obj: { error: boolean; image: string; errorMsg: string }) => {
-        setIsSharing(false);
-        if (!obj.error) {
-            try {
-                const blob = dataURLtoBlob(obj.image);
-                const file = new File([blob], `${fileName}.gif`, { type: "image/gif" });
-                if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                    await navigator.share({
-                        files: [file],
-                        title: 'My Polytopal Animation',
-                        text: 'Check out this animation I created!',
-                    });
-                } else {
-                    console.error("Sharing not supported for these files.");
-                    alert("Your browser doesn't support sharing this file.");
-                }
-            } catch (error) {
-                console.error('Error sharing GIF:', error);
-                if (error instanceof Error && error.name !== 'AbortError') {
-                  alert(`Sharing failed: ${error.message}`);
-                }
+        gifshot.createGIF({
+            images: imageUrls,
+            gifWidth: canvasRef.current.width,
+            gifHeight: canvasRef.current.height,
+            interval: intervalInSeconds,
+            ...qualitySettings[quality],
+        }, (obj: { error: boolean; image: string; errorMsg: string }) => {
+            setIsExporting(false);
+            if (!obj.error) {
+                const a = document.createElement('a');
+                a.href = obj.image;
+                a.download = `${fileName}.gif`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } else {
+                console.error('GIF export failed:', obj.errorMsg);
+                alert(`GIF export failed: ${obj.errorMsg}`);
             }
-        } else {
-            console.error('GIF export for sharing failed:', obj.errorMsg);
-            alert(`Could not create GIF for sharing: ${obj.errorMsg}`);
-        }
-    });
-  }, [frames, config.speed, isShareAvailable, fileName]);
-  
-  useEffect(() => {
-    // This effect runs after the component re-renders.
-    // If a pending action is set and we are now in animation mode,
-    // the canvas should be available to use.
-    if (pendingAction && viewMode === 'animation' && canvasRef.current) {
-        if (pendingAction === 'export') {
-            performExport();
-        } else if (pendingAction === 'share') {
-            performShare();
-        }
-        setPendingAction(null);
-    }
-  }, [pendingAction, viewMode, performExport, performShare]);
+        });
+    }, [frames, config.speed, fileName]);
+    
+    const performVideoExport = useCallback(async () => {
+      if (frames.length === 0 || !canvasRef.current) return;
+      
+      if (!('MediaRecorder' in window)) {
+        alert('Video recording is not supported in your browser.');
+        return;
+      }
 
+      setIsExporting(true);
+      
+      const offscreenCanvas = document.createElement('canvas');
+      offscreenCanvas.width = canvasRef.current.width;
+      offscreenCanvas.height = canvasRef.current.height;
+      const ctx = offscreenCanvas.getContext('2d');
+
+      if (!ctx) {
+          setIsExporting(false);
+          alert('Could not create canvas context for video export.');
+          return;
+      }
+      
+      const recordedChunks: Blob[] = [];
+      const stream = offscreenCanvas.captureStream(1000 / config.speed);
+      
+      const mimeTypes = ['video/mp4; codecs=avc1', 'video/webm; codecs=vp9', 'video/webm'];
+      const supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
+
+      if (!supportedMimeType) {
+        setIsExporting(false);
+        alert('No supported video format found for recording (MP4 or WebM).');
+        return;
+      }
+      
+      const recorder = new MediaRecorder(stream, { mimeType: supportedMimeType });
+      const fileExtension = supportedMimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
+      
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+            recordedChunks.push(event.data);
+        }
+      };
+      
+      recorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: supportedMimeType });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${fileName}.${fileExtension}`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          setIsExporting(false);
+      };
+
+      recorder.start();
+
+      let frameIndex = 0;
+      const drawFrame = () => {
+          if (frameIndex < frames.length) {
+              ctx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+              ctx.drawImage(frames[frameIndex], 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+              frameIndex++;
+              setTimeout(drawFrame, config.speed);
+          } else {
+              // Loop the video for a few cycles to make it longer
+              if (frameIndex < frames.length * 3) {
+                ctx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+                ctx.drawImage(frames[frameIndex % frames.length], 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+                frameIndex++;
+                setTimeout(drawFrame, config.speed);
+              } else {
+                recorder.stop();
+              }
+          }
+      };
+      drawFrame();
+
+    }, [frames, config.speed, fileName]);
+  
   useEffect(() => {
     if (!assets.imageData || !assets.imageData.data) {
         setIsLoading(false);
@@ -253,27 +348,7 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onRegenerate,
     const img = new Image();
     img.onload = () => {
         setSpriteSheetImage(img);
-        
-        const { naturalWidth, naturalHeight } = img;
-        console.log(`[DEBUG] Received sprite sheet with dimensions: ${naturalWidth}x${naturalHeight}`);
-        const frameWidth = Math.floor(naturalWidth / 3);
-        const frameHeight = Math.floor(naturalHeight / 3);
-        const frameLayout: Frame[] = [];
-        const cropAmount = 10; // The number of pixels to crop from each side
-
-        for (let i = 0; i < 9; i++) {
-            const initialX = (i % 3) * frameWidth;
-            const initialY = Math.floor(i / 3) * frameHeight;
-            frameLayout.push({ 
-                x: initialX + cropAmount, 
-                y: initialY + cropAmount, 
-                width: frameWidth - (cropAmount * 2), 
-                height: frameHeight - (cropAmount * 2) 
-            });
-        }
-        
-        setDisplayFrames(frameLayout);
-        processSpriteSheet(img, frameLayout);
+        processSpriteSheet(img, assets.frameCount);
     }
     img.onerror = () => {
         console.error("Failed to load generated image.");
@@ -302,11 +377,31 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onRegenerate,
       if(animationStartTimeRef.current === 0) animationStartTimeRef.current = timestamp;
       
       const totalDuration = frames.length * config.speed;
-      const elapsedTime = (timestamp - animationStartTimeRef.current) % totalDuration;
-      const currentFrameIndex = Math.floor(elapsedTime / config.speed);
+      let elapsedTime = timestamp - animationStartTimeRef.current;
       
+      if (assets.isLooping) {
+        elapsedTime = elapsedTime % totalDuration;
+      }
+
+      // If not looping and animation is finished, stop at the last frame
+      if (!assets.isLooping && elapsedTime >= totalDuration) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          if (frames[frames.length - 1]) {
+              ctx.drawImage(frames[frames.length - 1], 0, 0, canvas.width, canvas.height);
+          }
+          if (animationFrameId.current) {
+              cancelAnimationFrame(animationFrameId.current);
+              animationFrameId.current = null;
+          }
+          return;
+      }
+
+      const currentFrameIndex = Math.min(frames.length - 1, Math.floor(elapsedTime / config.speed));
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(frames[currentFrameIndex], 0, 0, canvas.width, canvas.height);
+      if (frames[currentFrameIndex]) {
+        ctx.drawImage(frames[currentFrameIndex], 0, 0, canvas.width, canvas.height);
+      }
       
       animationFrameId.current = requestAnimationFrame(animate);
     };
@@ -319,7 +414,7 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onRegenerate,
         animationFrameId.current = null;
       }
     };
-  }, [frames, config, isLoading, viewMode]);
+  }, [frames, config, isLoading, viewMode, assets.isLooping]);
   
   const getImageDisplayDimensions = useCallback(() => {
     if (!spriteSheetImage || !containerRef.current) {
@@ -399,27 +494,24 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onRegenerate,
     };
   }, [viewMode, spriteSheetImage, displayFrames, getImageDisplayDimensions]);
 
-
- const handleExport = () => {
-    if (viewMode === 'spritesheet') {
-        setViewMode('animation');
-        setPendingAction('export');
-    } else {
-        performExport();
-    }
- };
  
-  const handleShare = () => {
+  const handleStartExport = (format: ExportFormat, quality: GifQuality) => {
+    setIsExportModalOpen(false);
     if (viewMode === 'spritesheet') {
-        setViewMode('animation');
-        setPendingAction('share');
+      setViewMode('animation');
+      setTimeout(() => {
+        if (format === 'gif') performGifExport(quality);
+        else performVideoExport();
+      }, 100);
     } else {
-        performShare();
+      if (format === 'gif') performGifExport(quality);
+      else performVideoExport();
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center w-full max-w-4xl">
+    <div className="flex flex-col items-center justify-center w-full max-w-lg bg-gray-900/50 rounded-lg p-4 border border-gray-700">
+      <ExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} onStartExport={handleStartExport} />
       <div 
         ref={containerRef} 
         className="relative w-full max-w-lg aspect-square bg-black rounded-lg overflow-hidden shadow-2xl mb-4 flex items-center justify-center"
@@ -444,9 +536,7 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onRegenerate,
                   onClick={() => {
                     const newMode = viewMode === 'animation' ? 'spritesheet' : 'animation';
                     setViewMode(newMode);
-                    if (newMode === 'spritesheet') {
-                      setShowControls(false);
-                    }
+                    if (newMode === 'spritesheet') setShowControls(false);
                   }}
                   className="bg-black/50 p-2 rounded-full text-white hover:bg-black/75 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:ring-indigo-500"
                   aria-label={viewMode === 'animation' ? 'Show info and sprite sheet' : 'Close info and show animation'}
@@ -467,7 +557,7 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onRegenerate,
                   />
                   <div className="absolute bottom-0 left-0 right-0 bg-black/60 p-4 text-center z-10 backdrop-blur-sm">
                     <p className="text-sm text-gray-200 max-w-prose mx-auto">
-                        This animation was created with just one call to the 🍌 Gemini model by asking it to create this sprite sheet
+                        This {assets.frameCount}-frame animation was created with just one call to the 🍌 Gemini model.
                     </p>
                   </div>
                 </>
@@ -483,24 +573,22 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onRegenerate,
         <canvas ref={overlayCanvasRef} className="absolute top-0 left-0 pointer-events-none" />
         {showControls && viewMode === 'animation' && (
           <div className="absolute bottom-0 left-0 right-0 bg-black/70 p-4 z-30 backdrop-blur-sm space-y-2">
-            <ControlSlider label="Animation Speed (ms/frame)" value={config.speed} min={16} max={2000} step={1} onChange={v => setConfig(c => ({...c, speed: v}))} helpText="Lower values are faster. Frame duration can be up to 2 seconds."/>
+            <ControlSlider label="Animation Speed (ms/frame)" value={config.speed} min={16} max={2000} step={1} onChange={v => setConfig(c => ({...c, speed: v}))} helpText="Lower values are faster."/>
             <button onClick={() => setConfig({ ...DEFAULT_CONFIG, speed: assets.frameDuration || DEFAULT_CONFIG.speed })} className="text-sm text-indigo-400 hover:text-indigo-300">Reset to Defaults</button>
           </div>
         )}
       </div>
 
-    <div className={`grid ${isShareAvailable ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-2 w-full max-w-lg mb-4`}>
-        <button onClick={onBack} className="bg-gray-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-600 transition-colors duration-200 flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:ring-gray-500">Edit</button>
-        <button onClick={onRegenerate} className="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-500 transition-colors duration-200 flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:ring-red-500">Regenerate</button>
-        <button onClick={handleExport} disabled={isExporting} className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-500 transition-colors duration-200 flex items-center justify-center disabled:bg-green-800 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:ring-green-500">
-            {isExporting ? 'Exporting...' : 'Export GIF'}
+      <div className="grid grid-cols-2 gap-2 w-full">
+        <button onClick={onBack} className="bg-gray-700 text-white font-bold py-3 px-4 rounded-lg hover:bg-gray-600 transition-colors duration-200 flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:ring-gray-500">
+            <ArrowLeftIcon className="w-5 h-5 mr-2" />
+            Back
         </button>
-        {isShareAvailable && (
-            <button onClick={handleShare} disabled={isSharing} className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-500 transition-colors duration-200 flex items-center justify-center disabled:bg-blue-800 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:ring-blue-500">
-                {isSharing ? 'Sharing...' : 'Share'}
-            </button>
-        )}
-    </div>
+        <button onClick={() => setIsExportModalOpen(true)} disabled={isExporting} className="bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-500 transition-colors duration-200 flex items-center justify-center disabled:bg-green-800 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:ring-green-500">
+            <DownloadIcon className="w-5 h-5 mr-2" />
+            {isExporting ? 'Exporting...' : 'Export'}
+        </button>
+      </div>
     </div>
   );
 };

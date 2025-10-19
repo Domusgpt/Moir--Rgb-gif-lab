@@ -1,7 +1,5 @@
 {
-  "name": "Moiré er",
-  "description": "Create animated GIFs with Nano Banana from your images and prompts.",
-  "requestFramePermissions": [
-    "camera"
-  ]
+  "name": "Image Animator",
+  "description": "Create mesmerizing animations from your images using the Gemini API.",
+  "requestFramePermissions": []
 }
