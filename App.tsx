@@ -5,7 +5,7 @@
 
 
 import React, { useState, useCallback, useRef } from 'react';
-import { AppState } from './types';
+import { AppState, AnimationType, ANIMATION_TYPES } from './types';
 import { generateAnimationAssets, AnimationAssets } from './services/geminiService';
 import { buildCreativeInstruction } from './prompts';
 import AnimationPlayer from './components/AnimationPlayer';
@@ -61,7 +61,10 @@ const resizeImage = (dataUrl: string, maxWidth: number, maxHeight: number): Prom
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.Capturing);
+  const [animationType, setAnimationType] = useState<AnimationType>(AnimationType.Zoom);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
+  const [originalImageName, setOriginalImageName] = useState<string>('animation');
+  const [generationCount, setGenerationCount] = useState<number>(0);
   const [animationAssets, setAnimationAssets] = useState<AnimationAssets | null>(null);
   const [loadingMessage, setLoadingMessage] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +73,10 @@ const App: React.FC = () => {
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      const baseName = file.name.split('.').slice(0, -1).join('.') || 'animation';
+      setOriginalImageName(baseName);
+      setGenerationCount(0); // Reset for new image
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setOriginalImage(reader.result as string);
@@ -88,7 +95,10 @@ const App: React.FC = () => {
         return;
     }
 
-    const finalCreativeInstruction = buildCreativeInstruction(originalImage, FRAME_COUNT);
+    const newGenerationCount = isRegeneration ? generationCount + 1 : 1;
+    setGenerationCount(newGenerationCount);
+
+    const finalCreativeInstruction = buildCreativeInstruction(originalImage, FRAME_COUNT, animationType);
 
     setAppState(AppState.Processing);
     setError(null);
@@ -142,7 +152,7 @@ IMAGE OUTPUT REQUIREMENTS:
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
       setAppState(AppState.Capturing);
     }
-  }, [originalImage]);
+  }, [originalImage, generationCount, animationType]);
   
   const handleBack = () => {
     setAppState(AppState.Capturing);
@@ -155,11 +165,31 @@ IMAGE OUTPUT REQUIREMENTS:
         return (
           <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto text-center">
             <h1 className="text-4xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-500">
-              Polytopal Animator
+              Image Animator
             </h1>
-            <p className="text-gray-400 mb-8">
+            <p className="text-gray-400 mb-6">
               Create a mesmerizing, looping animation of any image.
             </p>
+
+            <div className="w-full max-w-sm mb-6">
+              <div className="overflow-x-auto no-scrollbar pb-1">
+                <nav className="-mb-px border-b border-gray-800 flex space-x-6" aria-label="Tabs">
+                  {ANIMATION_TYPES.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setAnimationType(tab.id)}
+                      className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors
+                        ${animationType === tab.id
+                          ? 'border-indigo-500 text-indigo-400'
+                          : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-500'}`
+                      }
+                    >
+                      {tab.name}
+                    </button>
+                  ))}
+                </nav>
+              </div>
+            </div>
 
             {error && (
               <div className="w-full bg-red-900/50 border border-red-700 text-red-100 px-4 py-3 rounded-lg relative mb-4 flex items-center justify-between animate-shake" role="alert">
@@ -234,7 +264,7 @@ IMAGE OUTPUT REQUIREMENTS:
       case AppState.Processing:
         return <LoadingOverlay message={loadingMessage} />;
       case AppState.Animating:
-        return animationAssets ? <AnimationPlayer assets={animationAssets} onRegenerate={() => handleCreateAnimation(true)} onBack={handleBack} /> : null;
+        return animationAssets ? <AnimationPlayer assets={animationAssets} onRegenerate={() => handleCreateAnimation(true)} onBack={handleBack} fileName={`${originalImageName}-${generationCount}`} /> : null;
       case AppState.Error:
         return (
           <div className="text-center bg-red-900/50 p-8 rounded-lg max-w-md w-full">

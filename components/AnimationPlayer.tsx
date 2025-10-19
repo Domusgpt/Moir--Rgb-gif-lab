@@ -22,6 +22,7 @@ interface AnimationPlayerProps {
   assets: AnimationAssets;
   onRegenerate: () => void;
   onBack: () => void;
+  fileName: string;
 }
 
 interface AnimationConfig {
@@ -89,7 +90,7 @@ const ControlSlider: React.FC<{
     </div>
 );
 
-const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onRegenerate, onBack }) => {
+const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onRegenerate, onBack, fileName }) => {
   const [frames, setFrames] = useState<HTMLImageElement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
@@ -173,7 +174,7 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onRegenerate,
         if (!obj.error) {
             const a = document.createElement('a');
             a.href = obj.image;
-            a.download = 'animation.gif';
+            a.download = `${fileName}.gif`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -181,7 +182,7 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onRegenerate,
             console.error('GIF export failed:', obj.errorMsg);
         }
     });
-  }, [frames, config.speed]);
+  }, [frames, config.speed, fileName]);
 
   const performShare = useCallback(async () => {
     if (!isShareAvailable || frames.length === 0 || !canvasRef.current) return;
@@ -202,11 +203,11 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onRegenerate,
         if (!obj.error) {
             try {
                 const blob = dataURLtoBlob(obj.image);
-                const file = new File([blob], "animation.gif", { type: "image/gif" });
+                const file = new File([blob], `${fileName}.gif`, { type: "image/gif" });
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
                     await navigator.share({
                         files: [file],
-                        title: 'My Banamimation',
+                        title: 'My Polytopal Animation',
                         text: 'Check out this animation I created!',
                     });
                 } else {
@@ -224,7 +225,7 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onRegenerate,
             alert(`Could not create GIF for sharing: ${obj.errorMsg}`);
         }
     });
-  }, [frames, config.speed, isShareAvailable]);
+  }, [frames, config.speed, isShareAvailable, fileName]);
   
   useEffect(() => {
     // This effect runs after the component re-renders.
