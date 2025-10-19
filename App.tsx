@@ -162,15 +162,16 @@ const App: React.FC = () => {
     });
   };
 
+  // FIX: Explicitly type the accumulator for `reduce` to prevent type inference issues.
   const groupedRequests = useMemo(() => {
-    return animationRequests.reduce((acc, req) => {
+    return animationRequests.reduce<Record<string, AnimationRequest[]>>((acc, req) => {
       const key = req.sourceImage.id;
       if (!acc[key]) {
         acc[key] = [];
       }
       acc[key].push(req);
       return acc;
-    }, {} as Record<string, AnimationRequest[]>);
+    }, {});
   }, [animationRequests]);
 
 
@@ -290,13 +291,20 @@ IMAGE OUTPUT REQUIREMENTS:
                     key={variant.id}
                     onClick={() => updateSelectedRequestOptions({ variantId: variant.id })}
                     disabled={!selectedRequestId}
-                    className={`w-full p-2 rounded-md text-sm text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 focus-visible:ring-indigo-500 ${currentOptions.variantId === variant.id 
-                        ? 'bg-indigo-600 text-white font-semibold' 
+                    className={`group relative h-12 flex items-center justify-center rounded-md text-sm text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 focus-visible:ring-indigo-500 overflow-hidden ${currentOptions.variantId === variant.id
+                        ? 'bg-indigo-600 text-white font-semibold'
                         : 'bg-gray-700 text-gray-300 hover:bg-gray-600'} disabled:opacity-50 disabled:cursor-not-allowed`
                     }
                     aria-pressed={currentOptions.variantId === variant.id}
                   >
-                    {variant.name}
+                    <span className="transition-opacity group-hover:opacity-0 px-2">{variant.name}</span>
+                    <img
+                      src={variant.previewGifUrl}
+                      alt={`${variant.name} animation preview`}
+                      className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                      aria-hidden="true"
+                      loading="lazy"
+                    />
                   </button>
                 ))}
               </div>

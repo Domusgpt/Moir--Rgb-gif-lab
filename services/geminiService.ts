@@ -45,18 +45,15 @@ export const generateAnimationAssets = async (
     }
     parts.push(imageGenTextPart);
     
-    // FIX: The responseModalities config was incorrect. It should only contain Modality.IMAGE for this model.
-    // However, since the prompt requests both text (JSON) and an image, removing the config altogether
-    // allows the model to determine the output modalities based on the prompt, which is more robust.
+    // FIX: The responseModalities config was forcing an image-only response, which conflicted with the
+    // prompt's request for both JSON and an image. Removing the config allows the model to determine
+    // the output modalities from the prompt, making it more robust for multimodal responses.
     const imageGenResponse: GenerateContentResponse = await ai.models.generateContent({
         model: imageModel,
         contents: [{
             role: "user",
             parts: parts,
         }],
-        config: {
-            responseModalities: [Modality.IMAGE],
-        },
     });
 
     const responseParts = imageGenResponse.candidates?.[0]?.content?.parts;
