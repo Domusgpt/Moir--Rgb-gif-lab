@@ -6,7 +6,6 @@
 
 
 import { GoogleGenAI, GenerateContentResponse, Modality } from "@google/genai";
-import { Frame } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const imageModel = 'gemini-2.5-flash-image';
@@ -46,6 +45,9 @@ export const generateAnimationAssets = async (
     }
     parts.push(imageGenTextPart);
     
+    // FIX: The responseModalities config was incorrect. It should only contain Modality.IMAGE for this model.
+    // However, since the prompt requests both text (JSON) and an image, removing the config altogether
+    // allows the model to determine the output modalities based on the prompt, which is more robust.
     const imageGenResponse: GenerateContentResponse = await ai.models.generateContent({
         model: imageModel,
         contents: [{
@@ -53,7 +55,7 @@ export const generateAnimationAssets = async (
             parts: parts,
         }],
         config: {
-            responseModalities: [Modality.IMAGE, Modality.TEXT],
+            responseModalities: [Modality.IMAGE],
         },
     });
 

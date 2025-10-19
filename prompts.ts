@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import { AnimationModifier } from "./types";
+import { AnimationModifier, AnimationOptions } from "./types";
 
 const PROMPT_MAP: Record<string, string> = {
   // Zoom Category
@@ -147,15 +147,6 @@ const PROMPT_MAP: Record<string, string> = {
   'papercraft-diorama': `Animate a '3D diorama' assembly. The animation shows a 3D scene being built inside a box using paper cutouts. Elements are placed in the foreground, midground, and background to create a complete, multi-layered scene that represents the source image.`
 };
 
-export interface AnimationOptions {
-  variantId: string;
-  frameCount: 9 | 16;
-  frameDuration: number;
-  isLooping: boolean;
-  effectIntensity: 'low' | 'medium' | 'high';
-  modifier: AnimationModifier;
-}
-
 const MODIFIER_INSTRUCTIONS: Record<AnimationModifier, string> = {
   'none': '',
   'rotate': `GLOBAL MODIFIER: Apply a smooth, continuous 360-degree clockwise rotation to the entire canvas throughout the animation. This rotation is a secondary effect that must happen concurrently with the primary creative direction. The final frame should seamlessly loop back to the first frame's rotation angle.`,
@@ -181,7 +172,8 @@ export const buildCreativeInstruction = (options: AnimationOptions): string => {
   };
   const intensityInstruction = intensityMap[effectIntensity];
   
-  const centeringInstruction = `CRITICAL REQUIREMENT: The primary subject of the image MUST remain perfectly centered in every frame relative to the canvas. Do not allow the subject to drift or change its central position, unless the Global Modifier (e.g., Pan) requires it. The scale of the subject should also remain consistent, unless the animation style (e.g., a zoom effect) or a Global Modifier inherently requires it to change.`;
+  // The centering instruction is only applied when there's no global movement modifier.
+  const centeringInstruction = `CRITICAL REQUIREMENT: The primary subject of the image MUST remain perfectly centered in every frame relative to the canvas. Do not allow the subject to drift or change its central position. The scale of the subject should also remain consistent.`;
 
   const styleConsistencyInstruction = `It is crucial that all frames are in the same, consistent artistic style. Maintain the subject's integrity and core shapes consistently across all frames.`;
   
@@ -192,7 +184,7 @@ CREATIVE DIRECTION:
 ${modifierInstruction ? `${modifierInstruction}\n\nPRIMARY EFFECT:\n${storyPrompt}` : storyPrompt}
 ${intensityInstruction}
 ${loopInstruction}
-${centeringInstruction}
+${modifier === 'none' ? centeringInstruction : ''}
 ${styleConsistencyInstruction}`;
   
   return `

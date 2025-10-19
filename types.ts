@@ -3,8 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import { AnimationAssets } from "./services/geminiService";
-
 export interface UploadedImage {
   id: string;
   dataUrl: string;
@@ -12,6 +10,22 @@ export interface UploadedImage {
 }
 
 export type AnimationModifier = 'none' | 'rotate' | 'zoomIn' | 'zoomOut' | 'pan';
+
+export interface AnimationOptions {
+  variantId: string;
+  frameCount: 9 | 16;
+  frameDuration: number;
+  isLooping: boolean;
+  effectIntensity: 'low' | 'medium' | 'high';
+  modifier: AnimationModifier;
+}
+
+export interface AnimationRequest {
+  id: string;
+  sourceImage: UploadedImage;
+  options: AnimationOptions;
+}
+
 
 export const MODIFIERS: { id: AnimationModifier; name: string; }[] = [
   { id: 'none', name: 'None' },

@@ -8,7 +8,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AnimationAssets } from '../services/geminiService';
 import { Frame } from '../types';
 import BananaLoader from './BananaLoader';
-import { InfoIcon, XCircleIcon, SettingsIcon, DownloadIcon, ArrowLeftIcon } from './icons';
+import { InfoIcon, XCircleIcon, SettingsIcon, DownloadIcon, ArrowLeftIcon, CheckIcon } from './icons';
 
 // Add declaration for the gifshot library loaded from CDN
 declare var gifshot: any;
@@ -91,18 +91,29 @@ type GifQuality = 'low' | 'medium' | 'high';
 interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onStartExport: (format: ExportFormat, quality: GifQuality) => void;
+  onStartExport: (format: ExportFormat, quality: GifQuality, fileName: string) => void;
+  defaultFileName: string;
 }
 
-const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, onStartExport }) => {
+const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, onStartExport, defaultFileName }) => {
     const [format, setFormat] = useState<ExportFormat>('gif');
     const [quality, setQuality] = useState<GifQuality>('medium');
+    const [customFileName, setCustomFileName] = useState(defaultFileName);
+    const [addIdentifier, setAddIdentifier] = useState(true);
 
     if (!isOpen) return null;
+    
+    const handleExportClick = () => {
+        let finalName = customFileName.trim() || defaultFileName;
+        if (addIdentifier) {
+            finalName = `${finalName}_${Date.now()}`;
+        }
+        onStartExport(format, quality, finalName);
+    };
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
-            <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 space-y-6" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center">
                     <h2 className="text-xl font-bold text-white">Export Options</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-white">
@@ -110,8 +121,8 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, onStartExpor
                     </button>
                 </div>
                 
-                <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-300">Format</label>
+                <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Format</label>
                     <div className="grid grid-cols-2 gap-2">
                         <button onClick={() => setFormat('gif')} className={`p-2 rounded-md text-center ${format === 'gif' ? 'bg-indigo-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>GIF</button>
                         <button onClick={() => setFormat('video')} className={`p-2 rounded-md text-center ${format === 'video' ? 'bg-indigo-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>Video</button>
@@ -127,9 +138,26 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, onStartExpor
                     </div>
                     <p className="text-xs text-gray-400">Low quality results in a smaller file size.</p>
                 </div>
+
+                <div className='space-y-2'>
+                  <label htmlFor="filename-input" className="block text-sm font-medium text-gray-300">Filename</label>
+                  <input
+                    id="filename-input"
+                    type="text"
+                    value={customFileName}
+                    onChange={(e) => setCustomFileName(e.target.value)}
+                    className="w-full bg-gray-900 text-white border border-gray-600 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <div className="flex items-center gap-2 mt-2">
+                      <button onClick={() => setAddIdentifier(!addIdentifier)} className={`w-5 h-5 rounded border-2 flex items-center justify-center ${addIdentifier ? 'bg-indigo-600 border-indigo-500' : 'bg-gray-700 border-gray-500'}`}>
+                          {addIdentifier && <CheckIcon className="w-4 h-4 text-white" />}
+                      </button>
+                      <label onClick={() => setAddIdentifier(!addIdentifier)} className="text-sm text-gray-300 cursor-pointer">Add unique identifier</label>
+                  </div>
+                </div>
                 
                 <button 
-                  onClick={() => onStartExport(format, quality)} 
+                  onClick={handleExportClick} 
                   className="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-500 transition-colors duration-200 flex items-center justify-center"
                 >
                   <DownloadIcon className="w-5 h-5 mr-2" />
@@ -221,7 +249,7 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
     });
   }, []);
 
-    const performGifExport = useCallback((quality: GifQuality) => {
+    const performGifExport = useCallback((quality: GifQuality, finalFileName: string) => {
         if (frames.length === 0 || !canvasRef.current) return;
         setIsExporting(true);
 
@@ -245,7 +273,7 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
             if (!obj.error) {
                 const a = document.createElement('a');
                 a.href = obj.image;
-                a.download = `${fileName}.gif`;
+                a.download = `${finalFileName}.gif`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
@@ -254,9 +282,9 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
                 alert(`GIF export failed: ${obj.errorMsg}`);
             }
         });
-    }, [frames, config.speed, fileName]);
+    }, [frames, config.speed]);
     
-    const performVideoExport = useCallback(async () => {
+    const performVideoExport = useCallback(async (finalFileName: string) => {
       if (frames.length === 0 || !canvasRef.current) return;
       
       if (!('MediaRecorder' in window)) {
@@ -303,7 +331,7 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `${fileName}.${fileExtension}`;
+          a.download = `${finalFileName}.${fileExtension}`;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -334,7 +362,7 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
       };
       drawFrame();
 
-    }, [frames, config.speed, fileName]);
+    }, [frames, config.speed]);
   
   useEffect(() => {
     if (!assets.imageData || !assets.imageData.data) {
@@ -495,23 +523,28 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
   }, [viewMode, spriteSheetImage, displayFrames, getImageDisplayDimensions]);
 
  
-  const handleStartExport = (format: ExportFormat, quality: GifQuality) => {
+  const handleStartExport = (format: ExportFormat, quality: GifQuality, finalFileName: string) => {
     setIsExportModalOpen(false);
     if (viewMode === 'spritesheet') {
       setViewMode('animation');
       setTimeout(() => {
-        if (format === 'gif') performGifExport(quality);
-        else performVideoExport();
+        if (format === 'gif') performGifExport(quality, finalFileName);
+        else performVideoExport(finalFileName);
       }, 100);
     } else {
-      if (format === 'gif') performGifExport(quality);
-      else performVideoExport();
+      if (format === 'gif') performGifExport(quality, finalFileName);
+      else performVideoExport(finalFileName);
     }
   };
 
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-lg bg-gray-900/50 rounded-lg p-4 border border-gray-700">
-      <ExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} onStartExport={handleStartExport} />
+      <ExportModal 
+        isOpen={isExportModalOpen} 
+        onClose={() => setIsExportModalOpen(false)} 
+        onStartExport={handleStartExport}
+        defaultFileName={fileName}
+      />
       <div 
         ref={containerRef} 
         className="relative w-full max-w-lg aspect-square bg-black rounded-lg overflow-hidden shadow-2xl mb-4 flex items-center justify-center"
