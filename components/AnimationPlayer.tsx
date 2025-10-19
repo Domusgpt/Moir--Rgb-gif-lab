@@ -9,9 +9,7 @@ import { AnimationAssets } from '../services/geminiService';
 import { Frame } from '../types';
 import BananaLoader from './BananaLoader';
 import { InfoIcon, XCircleIcon, SettingsIcon, DownloadIcon, ArrowLeftIcon, CheckIcon } from './icons';
-
-// Add declaration for the gifshot library loaded from CDN
-declare var gifshot: any;
+import { createGifFromFrames } from '../services/gifService';
 
 interface AnimationPlayerProps {
   assets: AnimationAssets;
@@ -26,64 +24,6 @@ interface AnimationConfig {
 const DEFAULT_CONFIG: AnimationConfig = {
   speed: 120, // ms per frame
 };
-
-const dataURLtoBlob = (dataurl: string): Blob => {
-    const arr = dataurl.split(',');
-    if (arr.length < 2) {
-        throw new Error('Invalid data URL');
-    }
-    const mimeMatch = arr[0].match(/:(.*?);/);
-    if (!mimeMatch) {
-        throw new Error('Could not parse MIME type from data URL');
-    }
-    const mime = mimeMatch[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-        u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new Blob([u8arr], { type: mime });
-}
-
-
-const ControlSlider: React.FC<{
-    label: string;
-    value: number;
-    min: number;
-    max: number;
-    step: number;
-    onChange: (value: number) => void;
-    helpText: string;
-}> = ({ label, value, min, max, step, onChange, helpText }) => (
-    <div>
-        <label htmlFor={label} className="block text-sm font-medium text-gray-300">
-            {label}
-        </label>
-        <div className="flex items-center gap-3 mt-1">
-            <input
-                id={label}
-                type="range"
-                min={min}
-                max={max}
-                step={step}
-                value={value}
-                onChange={e => onChange(Number(e.target.value))}
-                className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-            />
-            <input
-                type="number"
-                value={value}
-                min={min}
-                max={max}
-                onChange={e => onChange(Number(e.target.value))}
-                className="w-20 bg-gray-900 text-white border border-gray-600 rounded-md px-2 py-1 text-center"
-            />
-        </div>
-        <p className="text-xs text-gray-400 mt-2">{helpText}</p>
-    </div>
-);
-
 
 type ExportFormat = 'gif' | 'video';
 type GifQuality = 'low' | 'medium' | 'high';
@@ -168,6 +108,38 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, onStartExpor
     );
 };
 
+// FIX: Define the missing ControlSlider component.
+const ControlSlider: React.FC<{
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+  helpText?: string;
+}> = ({ label, value, min, max, step, onChange, helpText }) => {
+  const id = React.useId ? React.useId() : `slider-${Math.random()}`;
+  return (
+    <div className="text-sm">
+      <label htmlFor={id} className="block text-gray-300 font-medium">{label}</label>
+      <div className="flex items-center gap-2 mt-1">
+        <input
+          id={id}
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={e => onChange(Number(e.target.value))}
+          className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+        />
+        <span className="text-gray-200 w-20 text-center">{value}</span>
+      </div>
+      {helpText && <p className="text-xs text-gray-400 mt-1">{helpText}</p>}
+    </div>
+  );
+};
+
 
 const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileName }) => {
   const [frames, setFrames] = useState<HTMLImageElement[]>([]);
@@ -189,7 +161,78 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const [displayFrames, setDisplayFrames] = useState<Frame[]>([]);
   
-  const processSpriteSheet = useCallback((img: HTMLImageElement, frameCount: number) => {
+  const performAntiJitter = async (rawFrames: HTMLImageElement[]): Promise<HTMLImageElement[]> => {
+    const getBoundingBox = (img: HTMLImageElement): Promise<{x: number, y: number, width: number, height: number}> => {
+      return new Promise(resolve => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if(!ctx) return resolve({ x: 0, y: 0, width: img.width, height: img.height });
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        let minX = canvas.width, minY = canvas.height, maxX = -1, maxY = -1;
+        const threshold = 30; // Consider pixels with alpha > threshold
+
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            const alpha = data[(y * canvas.width + x) * 4 + 3];
+            if (alpha > threshold) {
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+        
+        if (maxX === -1) { // Empty frame
+          resolve({ x: 0, y: 0, width: img.width, height: img.height });
+        } else {
+          resolve({ x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 });
+        }
+      });
+    };
+  
+    const boundingBoxes = await Promise.all(rawFrames.map(getBoundingBox));
+  
+    // Calculate the union of all bounding boxes
+    let unionBox = { x1: Infinity, y1: Infinity, x2: -Infinity, y2: -Infinity };
+    boundingBoxes.forEach(box => {
+      unionBox.x1 = Math.min(unionBox.x1, box.x);
+      unionBox.y1 = Math.min(unionBox.y1, box.y);
+      unionBox.x2 = Math.max(unionBox.x2, box.x + box.width);
+      unionBox.y2 = Math.max(unionBox.y2, box.y + box.height);
+    });
+  
+    const unionWidth = unionBox.x2 - unionBox.x1;
+    const unionHeight = unionBox.y2 - unionBox.y1;
+  
+    if (unionWidth <= 0 || unionHeight <= 0) return rawFrames; // No content found
+  
+    const stabilizedFramesPromises = rawFrames.map(frame => {
+      return new Promise<HTMLImageElement>((resolve, reject) => {
+        const frameCanvas = document.createElement('canvas');
+        frameCanvas.width = unionWidth;
+        frameCanvas.height = unionHeight;
+        const ctx = frameCanvas.getContext('2d');
+        if(!ctx) return reject(new Error('Canvas context failed for stabilization'));
+  
+        // Draw the original frame centered within the new canvas based on the union box
+        ctx.drawImage(frame, -unionBox.x1, -unionBox.y1);
+        
+        const newFrameImg = new Image();
+        newFrameImg.onload = () => resolve(newFrameImg);
+        newFrameImg.onerror = reject;
+        newFrameImg.src = frameCanvas.toDataURL();
+      });
+    });
+  
+    return Promise.all(stabilizedFramesPromises);
+  };
+  
+  const processSpriteSheet = useCallback(async (img: HTMLImageElement, frameCount: number, enableAntiJitter: boolean) => {
     const gridSize = Math.sqrt(frameCount);
     if (!Number.isInteger(gridSize)) {
         console.error(`Invalid frame count for square grid: ${frameCount}`);
@@ -200,88 +243,59 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
     const { naturalWidth, naturalHeight } = img;
     const frameWidth = Math.floor(naturalWidth / gridSize);
     const frameHeight = Math.floor(naturalHeight / gridSize);
-    const frameLayout: Frame[] = [];
-    const cropAmount = 10; // Crop a bit to remove potential grid line artifacts
-
-    for (let i = 0; i < frameCount; i++) {
+    
+    // First, slice the spritesheet into raw frames
+    const rawFramePromises: Promise<HTMLImageElement>[] = Array.from({length: frameCount}).map((_, i) => {
+      return new Promise((resolve, reject) => {
+        const frameCanvas = document.createElement('canvas');
+        frameCanvas.width = frameWidth;
+        frameCanvas.height = frameHeight;
+        const ctx = frameCanvas.getContext('2d');
+        if(!ctx) return reject(new Error('Canvas context failed'));
         const row = Math.floor(i / gridSize);
         const col = i % gridSize;
-        const initialX = col * frameWidth;
-        const initialY = row * frameHeight;
-        frameLayout.push({ 
-            x: initialX + cropAmount, 
-            y: initialY + cropAmount, 
-            width: frameWidth - (cropAmount * 2), 
-            height: frameHeight - (cropAmount * 2) 
-        });
-    }
-
-    setDisplayFrames(frameLayout);
-
-    const framePromises: Promise<HTMLImageElement>[] = frameLayout.map(frame => {
-      return new Promise((resolve, reject) => {
-        if (frame.width <= 0 || frame.height <= 0) {
-            const emptyImage = new Image();
-            emptyImage.onload = () => resolve(emptyImage);
-            emptyImage.src = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
-            return;
-        }
-        const frameCanvas = document.createElement('canvas');
-        frameCanvas.width = frame.width;
-        frameCanvas.height = frame.height;
-        const frameCtx = frameCanvas.getContext('2d');
-        if (frameCtx) {
-          frameCtx.drawImage(img, frame.x, frame.y, frame.width, frame.height, 0, 0, frame.width, frame.height);
-        }
+        ctx.drawImage(img, col * frameWidth, row * frameHeight, frameWidth, frameHeight, 0, 0, frameWidth, frameHeight);
+        
         const frameImage = new Image();
         frameImage.onload = () => resolve(frameImage);
-        frameImage.onerror = () => reject(new Error('Failed to load sliced frame image'));
+        frameImage.onerror = reject;
         frameImage.src = frameCanvas.toDataURL();
       });
     });
-
-    Promise.all(framePromises).then(loadedFrames => {
-      setFrames(loadedFrames);
+    
+    try {
+      const rawFrames = await Promise.all(rawFramePromises);
+      
+      if(enableAntiJitter && rawFrames.length > 0) {
+        const stabilizedFrames = await performAntiJitter(rawFrames);
+        setFrames(stabilizedFrames);
+      } else {
+        setFrames(rawFrames);
+      }
       setIsLoading(false);
-    }).catch(error => {
-        console.error("Error loading frame images:", error);
-        setIsLoading(false);
-    });
+    } catch(error) {
+       console.error("Error processing frames:", error);
+       setIsLoading(false);
+    }
   }, []);
 
-    const performGifExport = useCallback((quality: GifQuality, finalFileName: string) => {
+    const performGifExport = useCallback(async (quality: GifQuality, finalFileName: string) => {
         if (frames.length === 0 || !canvasRef.current) return;
         setIsExporting(true);
-
-        const qualitySettings = {
-            low: { sampleInterval: 20, numWorkers: 2 },
-            medium: { sampleInterval: 10, numWorkers: 4 },
-            high: { sampleInterval: 1, numWorkers: 4 },
-        };
-
-        const imageUrls = frames.map(frame => frame.src);
-        const intervalInSeconds = config.speed / 1000;
-
-        gifshot.createGIF({
-            images: imageUrls,
-            gifWidth: canvasRef.current.width,
-            gifHeight: canvasRef.current.height,
-            interval: intervalInSeconds,
-            ...qualitySettings[quality],
-        }, (obj: { error: boolean; image: string; errorMsg: string }) => {
-            setIsExporting(false);
-            if (!obj.error) {
-                const a = document.createElement('a');
-                a.href = obj.image;
-                a.download = `${finalFileName}.gif`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            } else {
-                console.error('GIF export failed:', obj.errorMsg);
-                alert(`GIF export failed: ${obj.errorMsg}`);
-            }
-        });
+        try {
+          const gifUrl = await createGifFromFrames(frames, config.speed, quality);
+          const a = document.createElement('a');
+          a.href = gifUrl;
+          a.download = `${finalFileName}.gif`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        } catch(e) {
+          console.error('GIF export failed:', e);
+          alert(`GIF export failed: ${e}`);
+        } finally {
+           setIsExporting(false);
+        }
     }, [frames, config.speed]);
     
     const performVideoExport = useCallback(async (finalFileName: string) => {
@@ -295,8 +309,9 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
       setIsExporting(true);
       
       const offscreenCanvas = document.createElement('canvas');
-      offscreenCanvas.width = canvasRef.current.width;
-      offscreenCanvas.height = canvasRef.current.height;
+      // Use the dimensions of the first stabilized frame for the video
+      offscreenCanvas.width = frames[0].width;
+      offscreenCanvas.height = frames[0].height;
       const ctx = offscreenCanvas.getContext('2d');
 
       if (!ctx) {
@@ -306,7 +321,7 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
       }
       
       const recordedChunks: Blob[] = [];
-      const stream = offscreenCanvas.captureStream(1000 / config.speed);
+      const stream = offscreenCanvas.captureStream(30); // 30 FPS
       
       const mimeTypes = ['video/mp4; codecs=avc1', 'video/webm; codecs=vp9', 'video/webm'];
       const supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
@@ -342,27 +357,28 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
       recorder.start();
 
       let frameIndex = 0;
+      const totalAnimationTime = frames.length * config.speed;
+      const loopCount = 3;
+      const totalRecordTime = assets.isLooping ? Math.max(3000, totalAnimationTime * loopCount) : totalAnimationTime; // Record for at least 3 seconds if looping
+      const startTime = performance.now();
+
       const drawFrame = () => {
-          if (frameIndex < frames.length) {
-              ctx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
-              ctx.drawImage(frames[frameIndex], 0, 0, offscreenCanvas.width, offscreenCanvas.height);
-              frameIndex++;
-              setTimeout(drawFrame, config.speed);
-          } else {
-              // Loop the video for a few cycles to make it longer
-              if (frameIndex < frames.length * 3) {
-                ctx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
-                ctx.drawImage(frames[frameIndex % frames.length], 0, 0, offscreenCanvas.width, offscreenCanvas.height);
-                frameIndex++;
-                setTimeout(drawFrame, config.speed);
-              } else {
-                recorder.stop();
-              }
-          }
+        const elapsedTime = performance.now() - startTime;
+        if (elapsedTime >= totalRecordTime) {
+            recorder.stop();
+            return;
+        }
+
+        frameIndex = Math.floor((elapsedTime % totalAnimationTime) / config.speed);
+
+        ctx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+        ctx.drawImage(frames[frameIndex], 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+
+        requestAnimationFrame(drawFrame);
       };
       drawFrame();
 
-    }, [frames, config.speed]);
+    }, [frames, config.speed, assets.isLooping]);
   
   useEffect(() => {
     if (!assets.imageData || !assets.imageData.data) {
@@ -376,7 +392,7 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
     const img = new Image();
     img.onload = () => {
         setSpriteSheetImage(img);
-        processSpriteSheet(img, assets.frameCount);
+        processSpriteSheet(img, assets.frameCount, assets.enableAntiJitter);
     }
     img.onerror = () => {
         console.error("Failed to load generated image.");
@@ -398,8 +414,9 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    canvas.width = 512;
-    canvas.height = 512;
+    // Set canvas dimensions based on the processed frames
+    canvas.width = frames[0].width;
+    canvas.height = frames[0].height;
     
     const animate = (timestamp: number) => {
       if(animationStartTimeRef.current === 0) animationStartTimeRef.current = timestamp;
@@ -411,7 +428,6 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
         elapsedTime = elapsedTime % totalDuration;
       }
 
-      // If not looping and animation is finished, stop at the last frame
       if (!assets.isLooping && elapsedTime >= totalDuration) {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           if (frames[frames.length - 1]) {
@@ -444,85 +460,6 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
     };
   }, [frames, config, isLoading, viewMode, assets.isLooping]);
   
-  const getImageDisplayDimensions = useCallback(() => {
-    if (!spriteSheetImage || !containerRef.current) {
-      return { x: 0, y: 0, width: 0, height: 0, scale: 1 };
-    }
-    const container = containerRef.current;
-    const containerRect = container.getBoundingClientRect();
-    const imgRatio = spriteSheetImage.naturalWidth / spriteSheetImage.naturalHeight;
-    const containerRatio = containerRect.width / containerRect.height;
-    let finalWidth, finalHeight, offsetX, offsetY;
-  
-    if (imgRatio > containerRatio) { // Image is wider than container
-      finalWidth = containerRect.width;
-      finalHeight = finalWidth / imgRatio;
-      offsetX = 0;
-      offsetY = (containerRect.height - finalHeight) / 2;
-    } else { // Image is taller or same aspect ratio
-      finalHeight = containerRect.height;
-      finalWidth = finalHeight * imgRatio;
-      offsetY = 0;
-      offsetX = (containerRect.width - finalWidth) / 2;
-    }
-  
-    return {
-      width: finalWidth,
-      height: finalHeight,
-      x: offsetX,
-      y: offsetY,
-      scale: finalWidth / spriteSheetImage.naturalWidth,
-    };
-  }, [spriteSheetImage]);
-
-  useEffect(() => {
-    const canvas = overlayCanvasRef.current;
-    const container = containerRef.current;
-    const img = spriteSheetImage;
-
-    if (viewMode !== 'spritesheet' || !canvas || !container || !img || displayFrames.length === 0) {
-      if (canvas) {
-        const ctx = canvas.getContext('2d');
-        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-      }
-      return;
-    }
-
-    const drawGrid = () => {
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      const containerRect = container.getBoundingClientRect();
-      canvas.width = containerRect.width;
-      canvas.height = containerRect.height;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      const color = '#10B981'; // green-500 for the calculated grid
-      
-      const { scale, x: offsetX, y: offsetY } = getImageDisplayDimensions();
-      
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      
-      displayFrames.forEach((frame) => {
-          const rectX = frame.x * scale + offsetX;
-          const rectY = frame.y * scale + offsetY;
-          const rectW = frame.width * scale;
-          const rectH = frame.height * scale;
-          ctx.strokeRect(rectX, rectY, rectW, rectH);
-      });
-    };
-
-    const resizeObserver = new ResizeObserver(drawGrid);
-    resizeObserver.observe(container);
-    drawGrid(); // Initial draw
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [viewMode, spriteSheetImage, displayFrames, getImageDisplayDimensions]);
-
- 
   const handleStartExport = (format: ExportFormat, quality: GifQuality, finalFileName: string) => {
     setIsExportModalOpen(false);
     if (viewMode === 'spritesheet') {
@@ -552,6 +489,7 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
         {isLoading ? (
            <div className="flex flex-col items-center justify-center text-center p-8">
             <BananaLoader className="w-60 h-60" />
+            <p className="mt-4 text-gray-300">Processing Frames...</p>
           </div>
         ) : (
             <>
@@ -590,7 +528,7 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
                   />
                   <div className="absolute bottom-0 left-0 right-0 bg-black/60 p-4 text-center z-10 backdrop-blur-sm">
                     <p className="text-sm text-gray-200 max-w-prose mx-auto">
-                        This {assets.frameCount}-frame animation was created with just one call to the 🍌 Gemini model.
+                        This {assets.frameCount}-frame animation was created with just one call to the Gemini model.
                     </p>
                   </div>
                 </>

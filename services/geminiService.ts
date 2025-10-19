@@ -17,6 +17,7 @@ export interface AnimationAssets {
   frameCount: number;
   frameDuration: number;
   isLooping: boolean;
+  enableAntiJitter: boolean;
 }
 
 const base64ToGenerativePart = (base64: string, mimeType: string) => {
@@ -33,7 +34,9 @@ export const generateAnimationAssets = async (
     mimeType: string | null,
     imagePrompt: string,
     sourceImageId: string,
-    isLooping: boolean
+    isLooping: boolean,
+    enableAntiJitter: boolean,
+    expectsJson: boolean = true // Default to true for main generation
 ): Promise<AnimationAssets | null> => {
   try {
     const imageGenTextPart = { text: imagePrompt };
@@ -45,9 +48,6 @@ export const generateAnimationAssets = async (
     }
     parts.push(imageGenTextPart);
     
-    // FIX: The responseModalities config was forcing an image-only response, which conflicted with the
-    // prompt's request for both JSON and an image. Removing the config allows the model to determine
-    // the output modalities from the prompt, making it more robust for multimodal responses.
     const imageGenResponse: GenerateContentResponse = await ai.models.generateContent({
         model: imageModel,
         contents: [{
@@ -69,28 +69,31 @@ export const generateAnimationAssets = async (
     }
     const imageData = { data: imagePart.inlineData.data, mimeType: imagePart.inlineData.mimeType };
     
-    // Extract and parse frame duration and count from the text part
-    let frameDuration = 120; // Default fallback value
-    let frameCount = 9; // Default fallback value
-    const textPart = responseParts.find(p => p.text);
-    if (textPart?.text) {
-        try {
-            const jsonStringMatch = textPart.text.match(/{.*}/s);
-            if (jsonStringMatch) {
-                const parsed = JSON.parse(jsonStringMatch[0]);
-                if (parsed.frameDuration && typeof parsed.frameDuration === 'number') {
-                    frameDuration = parsed.frameDuration;
+    let frameDuration = 120;
+    let frameCount = 9;
+    
+    if (expectsJson) {
+      const textPart = responseParts.find(p => p.text);
+      if (textPart?.text) {
+          try {
+              const jsonStringMatch = textPart.text.match(/{.*}/s);
+              if (jsonStringMatch) {
+                  const parsed = JSON.parse(jsonStringMatch[0]);
+                  if (parsed.frameDuration && typeof parsed.frameDuration === 'number') {
+                      frameDuration = parsed.frameDuration;
+                  }
+                  if (parsed.frameCount && typeof parsed.frameCount === 'number') {
+                    frameCount = parsed.frameCount;
                 }
-                if (parsed.frameCount && typeof parsed.frameCount === 'number') {
-                  frameCount = parsed.frameCount;
               }
-            }
-        } catch (e) {
-            console.warn("Could not parse animation data from model response. Using defaults.", e);
-        }
+          } catch (e) {
+              console.warn("Could not parse animation data from model response. Using defaults.", e);
+          }
+      }
     }
 
-    return { sourceImageId, imageData, frameCount, frameDuration, isLooping };
+
+    return { sourceImageId, imageData, frameCount, frameDuration, isLooping, enableAntiJitter };
   } catch (error) {
     console.error("Error during asset generation:", error);
     throw new Error(`Failed to process image. ${error instanceof Error ? error.message : ''}`);
