@@ -146,8 +146,8 @@ IMAGE OUTPUT REQUIREMENTS:
 - The image MUST contain 9 frames in a 3x3 grid.
 - Do not add numbers to the frames. DO NOT return any text or JSON.`;
 
-        // FIX: Pass `false` for the `expectsJson` parameter as the preview prompt does not ask for JSON output.
-        const generatedAsset = await generateAnimationAssets(base64Image, mimeType, imageGenerationPrompt, "preview", true, false, false);
+        // Pass `false` for the `expectsJson` parameter as the preview prompt does not ask for JSON output.
+        const generatedAsset = await generateAnimationAssets(base64Image, mimeType, imageGenerationPrompt, "preview", previewOptions.isLooping, previewOptions.enableAntiJitter, false);
         
         if (generatedAsset) {
           const img = new Image();
@@ -276,14 +276,15 @@ IMAGE OUTPUT REQUIREMENTS:
   };
 
   const groupedRequests = useMemo(() => {
-    return animationRequests.reduce<Record<string, AnimationRequest[]>>((acc, req) => {
+    // FIX: Explicitly type the initial value for the `reduce` function to prevent type inference issues.
+    return animationRequests.reduce((acc, req) => {
       const key = req.sourceImage.id;
       if (!acc[key]) {
         acc[key] = [];
       }
       acc[key].push(req);
       return acc;
-    }, {});
+    }, {} as Record<string, AnimationRequest[]>);
   }, [animationRequests]);
 
 
@@ -575,6 +576,11 @@ IMAGE OUTPUT REQUIREMENTS:
       >
         {isProcessing ? 'Processing...' : `Animate ${animationRequests.length > 0 ? animationRequests.length : ''} Task${animationRequests.length === 1 ? '' : 's'}`}
       </button>
+      {animationRequests.length > 0 && !isProcessing && (
+          <p className="text-xs text-gray-500 mt-2">
+              This will make {animationRequests.length} API call{animationRequests.length === 1 ? '' : 's'} which may incur costs.
+          </p>
+      )}
     </div>
   );
 
@@ -625,11 +631,16 @@ IMAGE OUTPUT REQUIREMENTS:
         </div>
       )}
 
-      <footer className="w-full shrink-0 p-4 text-center text-gray-500 text-xs">
-        Built with the Gemini API. Use of this tool may incur costs based on
-        <a href="https://ai.google.dev/gemini-api/pricing" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline ml-1">
-          Gemini API pricing
-        </a>.
+      <footer className="w-full shrink-0 p-4 text-center text-gray-500 text-xs space-y-1">
+        <p>
+          This tool uses the Gemini API to generate animations. Each animation task, including automatic animation previews, will make an API call.
+        </p>
+        <p>
+          API usage may incur costs. For the most up-to-date information, please review the{' '}
+          <a href="https://ai.google.dev/gemini-api/pricing" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">
+            official Gemini API pricing
+          </a>.
+        </p>
       </footer>
     </div>
   );
