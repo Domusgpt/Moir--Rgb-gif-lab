@@ -162,18 +162,20 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
   const [displayFrames, setDisplayFrames] = useState<Frame[]>([]);
   
   const performAntiJitter = async (rawFrames: HTMLImageElement[]): Promise<HTMLImageElement[]> => {
+    // Helper to find the bounding box of the actual content in an image, trimming transparency.
     const getBoundingBox = (img: HTMLImageElement): Promise<{x: number, y: number, width: number, height: number}> => {
       return new Promise(resolve => {
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
         canvas.height = img.height;
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if(!ctx) return resolve({ x: 0, y: 0, width: img.width, height: img.height });
+        if (!ctx) return resolve({ x: 0, y: 0, width: img.width, height: img.height });
+
         ctx.drawImage(img, 0, 0);
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
         let minX = canvas.width, minY = canvas.height, maxX = -1, maxY = -1;
-        const threshold = 30; // Consider pixels with alpha > threshold
+        const threshold = 10; // Consider pixels with alpha > threshold as content
 
         for (let y = 0; y < canvas.height; y++) {
           for (let x = 0; x < canvas.width; x++) {
@@ -187,8 +189,8 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
           }
         }
         
-        if (maxX === -1) { // Empty frame
-          resolve({ x: 0, y: 0, width: img.width, height: img.height });
+        if (maxX === -1) { // Frame is empty
+          resolve({ x: 0, y: 0, width: 0, height: 0 });
         } else {
           resolve({ x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 });
         }
@@ -196,31 +198,44 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ assets, onBack, fileN
     };
   
     const boundingBoxes = await Promise.all(rawFrames.map(getBoundingBox));
+    
+    // If any frame is empty, stabilization is unreliable, so return original frames.
+    if (boundingBoxes.some(box => box.width === 0 || box.height === 0)) {
+        console.warn("Anti-jitter skipped: one or more frames were empty.");
+        return rawFrames;
+    }
+
+    // Find the largest bounding box dimensions to define the new canvas size.
+    // This ensures no part of any frame gets clipped after repositioning.
+    const maxWidth = Math.max(...boundingBoxes.map(box => box.width));
+    const maxHeight = Math.max(...boundingBoxes.map(box => box.height));
+
+    if (maxWidth <= 0 || maxHeight <= 0) return rawFrames;
+
+    // The center of this new canvas is our target for alignment.
+    const targetCenterX = maxWidth / 2;
+    const targetCenterY = maxHeight / 2;
   
-    // Calculate the union of all bounding boxes
-    let unionBox = { x1: Infinity, y1: Infinity, x2: -Infinity, y2: -Infinity };
-    boundingBoxes.forEach(box => {
-      unionBox.x1 = Math.min(unionBox.x1, box.x);
-      unionBox.y1 = Math.min(unionBox.y1, box.y);
-      unionBox.x2 = Math.max(unionBox.x2, box.x + box.width);
-      unionBox.y2 = Math.max(unionBox.y2, box.y + box.height);
-    });
-  
-    const unionWidth = unionBox.x2 - unionBox.x1;
-    const unionHeight = unionBox.y2 - unionBox.y1;
-  
-    if (unionWidth <= 0 || unionHeight <= 0) return rawFrames; // No content found
-  
-    const stabilizedFramesPromises = rawFrames.map(frame => {
+    const stabilizedFramesPromises = rawFrames.map((frame, index) => {
       return new Promise<HTMLImageElement>((resolve, reject) => {
         const frameCanvas = document.createElement('canvas');
-        frameCanvas.width = unionWidth;
-        frameCanvas.height = unionHeight;
+        frameCanvas.width = maxWidth;
+        frameCanvas.height = maxHeight;
         const ctx = frameCanvas.getContext('2d');
-        if(!ctx) return reject(new Error('Canvas context failed for stabilization'));
+        if (!ctx) return reject(new Error('Canvas context failed for stabilization'));
   
-        // Draw the original frame centered within the new canvas based on the union box
-        ctx.drawImage(frame, -unionBox.x1, -unionBox.y1);
+        const box = boundingBoxes[index];
+        // Find the center of the content within the original, un-cropped frame.
+        const sourceContentCenterX = box.x + box.width / 2;
+        const sourceContentCenterY = box.y + box.height / 2;
+  
+        // Calculate the offset needed to move the original frame so that its
+        // content center aligns with the target center of the new canvas.
+        const dx = targetCenterX - sourceContentCenterX;
+        const dy = targetCenterY - sourceContentCenterY;
+  
+        // Draw the original frame onto the new, larger canvas with the calculated offset.
+        ctx.drawImage(frame, dx, dy);
         
         const newFrameImg = new Image();
         newFrameImg.onload = () => resolve(newFrameImg);

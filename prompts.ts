@@ -156,7 +156,7 @@ const MODIFIER_INSTRUCTIONS: Record<AnimationModifier, string> = {
 };
 
 export const buildCreativeInstruction = (options: AnimationOptions): string => {
-  const { variantId, frameCount, frameDuration, isLooping, effectIntensity, modifier, enableAntiJitter } = options;
+  const { variantId, frameCount, frameDuration, isLooping, effectIntensity, modifier } = options;
   
   const storyPrompt = PROMPT_MAP[variantId] || PROMPT_MAP['zoom-classic'];
   const modifierInstruction = MODIFIER_INSTRUCTIONS[modifier];
@@ -172,8 +172,6 @@ export const buildCreativeInstruction = (options: AnimationOptions): string => {
   };
   const intensityInstruction = intensityMap[effectIntensity];
   
-  const antiJitterInstruction = `CRITICAL REQUIREMENT: The primary subject of the image MUST remain perfectly centered in every frame relative to the canvas. Do not allow the subject to drift or change its central position. The scale of the subject should also remain consistent unless the primary animation effect is a zoom.`;
-
   const styleConsistencyInstruction = `It is crucial that all frames are in the same, consistent artistic style. Maintain the subject's integrity and core shapes consistently across all frames.`;
   
   const frameInstruction = `You MUST generate exactly ${frameCount} frames, arranged in a ${frameCount === 9 ? '3x3' : '4x4'} grid.`;
@@ -183,7 +181,6 @@ CREATIVE DIRECTION:
 ${modifierInstruction ? `${modifierInstruction}\n\nPRIMARY EFFECT:\n${storyPrompt}` : storyPrompt}
 ${intensityInstruction}
 ${loopInstruction}
-${enableAntiJitter ? antiJitterInstruction : ''}
 ${styleConsistencyInstruction}`;
   
   return `

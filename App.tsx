@@ -276,15 +276,17 @@ IMAGE OUTPUT REQUIREMENTS:
   };
 
   const groupedRequests = useMemo(() => {
-    // FIX: Explicitly type the initial value for the `reduce` function to prevent type inference issues.
-    return animationRequests.reduce((acc, req) => {
+    // FIX: The previous `reduce` implementation caused type inference issues.
+    // This was refactored to a `forEach` loop, which is more explicit and ensures correct typing.
+    const result: Record<string, AnimationRequest[]> = {};
+    animationRequests.forEach((req) => {
       const key = req.sourceImage.id;
-      if (!acc[key]) {
-        acc[key] = [];
+      if (!result[key]) {
+        result[key] = [];
       }
-      acc[key].push(req);
-      return acc;
-    }, {} as Record<string, AnimationRequest[]>);
+      result[key].push(req);
+    });
+    return result;
   }, [animationRequests]);
 
 
@@ -521,40 +523,44 @@ IMAGE OUTPUT REQUIREMENTS:
           </>
         ) : (
           <div className="w-full space-y-3">
-            {Object.entries(groupedRequests).map(([sourceImageId, requests]) => (
-              <div key={sourceImageId} className="flex gap-2 items-start">
-                <div className="relative w-16 h-16 shrink-0 group">
-                  <img src={requests[0].sourceImage.dataUrl} alt={requests[0].sourceImage.name} className="w-full h-full object-cover rounded-md" />
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); addVariation(requests[0].sourceImage); }}
-                      disabled={requests.length >= 5}
-                      className="text-white disabled:text-gray-500"
-                      aria-label="Add variation"
-                    >
-                      <PlusCircleIcon className="w-8 h-8" />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex-grow grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                  {requests.map(req => (
-                    <div key={req.id}
-                      onClick={() => setSelectedRequestId(req.id)}
-                      className={`relative aspect-square cursor-pointer rounded-md overflow-hidden ring-2 ${selectedRequestId === req.id ? 'ring-indigo-500' : 'ring-transparent'}`}
-                    >
-                      <img src={req.sourceImage.dataUrl} alt={req.sourceImage.name} className="w-full h-full object-cover" />
+            {/* FIX: Replaced Object.entries with Object.keys to ensure proper type inference for 'requests', resolving errors with '.length' and '.map' properties. */}
+            {Object.keys(groupedRequests).map((sourceImageId) => {
+              const requests = groupedRequests[sourceImageId];
+              return (
+                <div key={sourceImageId} className="flex gap-2 items-start">
+                  <div className="relative w-16 h-16 shrink-0 group">
+                    <img src={requests[0].sourceImage.dataUrl} alt={requests[0].sourceImage.name} className="w-full h-full object-cover rounded-md" />
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <button
-                        onClick={(e) => { e.stopPropagation(); removeRequest(req.id); }}
-                        className="absolute top-1 right-1 bg-black/60 p-0.5 rounded-full text-white hover:bg-black/80 transition-colors"
-                        aria-label={`Remove variation for ${req.sourceImage.name}`}
+                        onClick={(e) => { e.stopPropagation(); addVariation(requests[0].sourceImage); }}
+                        disabled={requests.length >= 5}
+                        className="text-white disabled:text-gray-500"
+                        aria-label="Add variation"
                       >
-                        <XCircleIcon className="w-5 h-5" />
+                        <PlusCircleIcon className="w-8 h-8" />
                       </button>
                     </div>
-                  ))}
+                  </div>
+                  <div className="flex-grow grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                    {requests.map(req => (
+                      <div key={req.id}
+                        onClick={() => setSelectedRequestId(req.id)}
+                        className={`relative aspect-square cursor-pointer rounded-md overflow-hidden ring-2 ${selectedRequestId === req.id ? 'ring-indigo-500' : 'ring-transparent'}`}
+                      >
+                        <img src={req.sourceImage.dataUrl} alt={req.sourceImage.name} className="w-full h-full object-cover" />
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeRequest(req.id); }}
+                          className="absolute top-1 right-1 bg-black/60 p-0.5 rounded-full text-white hover:bg-black/80 transition-colors"
+                          aria-label={`Remove variation for ${req.sourceImage.name}`}
+                        >
+                          <XCircleIcon className="w-5 h-5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
         <input
