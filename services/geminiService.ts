@@ -6,6 +6,7 @@
 
 
 import { GoogleGenAI, GenerateContentResponse, Modality } from "@google/genai";
+import { QualityTier, AnimationMetadata } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const imageModel = 'gemini-2.5-flash-image';
@@ -18,6 +19,8 @@ export interface AnimationAssets {
   frameDuration: number;
   isLooping: boolean;
   enableAntiJitter: boolean;
+  qualityTier?: QualityTier;
+  metadata?: AnimationMetadata; // Full metadata structure
 }
 
 const base64ToGenerativePart = (base64: string, mimeType: string) => {
@@ -36,7 +39,13 @@ export const generateAnimationAssets = async (
     sourceImageId: string,
     isLooping: boolean,
     enableAntiJitter: boolean,
-    expectsJson: boolean = true // Default to true for main generation
+    expectsJson: boolean = true, // Default to true for main generation
+    qualityTier: QualityTier = 'standard',
+    variantId?: string,
+    variantName?: string,
+    sourceImageName?: string,
+    effectIntensity?: 'low' | 'medium' | 'high',
+    modifier?: string
 ): Promise<AnimationAssets | null> => {
   try {
     const imageGenTextPart = { text: imagePrompt };
@@ -93,9 +102,107 @@ export const generateAnimationAssets = async (
     }
 
 
-    return { sourceImageId, imageData, frameCount, frameDuration, isLooping, enableAntiJitter };
+    // Generate metadata
+    const metadata = generateMetadata(
+      sourceImageId,
+      sourceImageName || 'Unknown',
+      variantId || 'unknown',
+      variantName,
+      qualityTier,
+      frameCount,
+      frameDuration,
+      isLooping,
+      effectIntensity || 'medium',
+      modifier as any || 'none',
+      enableAntiJitter,
+      imageData.data
+    );
+
+    return {
+      sourceImageId,
+      sourceImageName,
+      imageData,
+      frameCount,
+      frameDuration,
+      isLooping,
+      enableAntiJitter,
+      qualityTier,
+      metadata
+    };
   } catch (error) {
     console.error("Error during asset generation:", error);
     throw new Error(`Failed to process image. ${error instanceof Error ? error.message : ''}`);
   }
+};
+
+// Helper function to generate animation metadata
+const generateMetadata = (
+  sourceImageId: string,
+  sourceImageName: string,
+  variantId: string,
+  variantName: string | undefined,
+  qualityTier: QualityTier,
+  totalFrames: number,
+  frameDuration: number,
+  isLooping: boolean,
+  effectIntensity: 'low' | 'medium' | 'high',
+  modifier: any,
+  enableAntiJitter: boolean,
+  spriteSheetData: string
+): AnimationMetadata => {
+  const gridSize = Math.sqrt(totalFrames);
+  const resolution = qualityTier === 'nano' ? 256 : qualityTier === 'preview' ? 512 : 1024;
+  const frameWidth = resolution / gridSize;
+  const frameHeight = resolution / gridSize;
+
+  // Generate frame metadata
+  const frames = Array.from({ length: totalFrames }, (_, i) => {
+    const row = Math.floor(i / gridSize);
+    const col = i % gridSize;
+
+    return {
+      frameNumber: i,
+      timestamp: i * frameDuration,
+      gridPosition: { row, col },
+      sourceRect: {
+        x: col * frameWidth,
+        y: row * frameHeight,
+        width: frameWidth,
+        height: frameHeight
+      },
+      isKeyFrame: i === 0 || i === totalFrames - 1 // First and last frames are key frames
+    };
+  });
+
+  // Estimate cost based on quality tier
+  const costEstimates: Record<QualityTier, number> = {
+    nano: 0.001,
+    preview: 0.003,
+    standard: 0.006,
+    hd: 0.006
+  };
+
+  return {
+    version: '1.0.0',
+    generatedAt: new Date().toISOString(),
+    sourceImageId,
+    sourceImageName,
+    variantId,
+    variantName,
+    qualityTier,
+    resolution,
+    totalFrames,
+    frameDuration,
+    totalDuration: totalFrames * frameDuration,
+    isLooping,
+    gridSize,
+    frames,
+    generationOptions: {
+      effectIntensity,
+      modifier,
+      enableAntiJitter
+    },
+    costEstimate: costEstimates[qualityTier],
+    spriteSheetUrl: `data:image/png;base64,${spriteSheetData}`
+  };
 };

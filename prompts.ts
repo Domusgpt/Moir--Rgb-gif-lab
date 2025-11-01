@@ -174,7 +174,8 @@ export const buildCreativeInstruction = (options: AnimationOptions): string => {
   
   const styleConsistencyInstruction = `It is crucial that all frames are in the same, consistent artistic style. Maintain the subject's integrity and core shapes consistently across all frames.`;
   
-  const frameInstruction = `You MUST generate exactly ${frameCount} frames, arranged in a ${frameCount === 9 ? '3x3' : '4x4'} grid.`;
+  const gridLayout = frameCount === 4 ? '2x2' : frameCount === 9 ? '3x3' : '4x4';
+  const frameInstruction = `You MUST generate exactly ${frameCount} frames, arranged in a ${gridLayout} grid.`;
 
   const creativeDirection = `
 CREATIVE DIRECTION:

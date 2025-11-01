@@ -11,14 +11,56 @@ export interface UploadedImage {
 
 export type AnimationModifier = 'none' | 'rotate' | 'zoomIn' | 'zoomOut' | 'pan';
 
+export type QualityTier = 'nano' | 'preview' | 'standard' | 'hd';
+
+export interface QualityConfig {
+  resolution: number;
+  frameCount: 4 | 9 | 16;
+  estimatedCost: number; // in dollars
+  label: string;
+  description: string;
+}
+
+export const QUALITY_TIERS: Record<QualityTier, QualityConfig> = {
+  nano: {
+    resolution: 256,
+    frameCount: 4,
+    estimatedCost: 0.001,
+    label: 'Nano (Free)',
+    description: '256×256, 4 frames - Fast preview'
+  },
+  preview: {
+    resolution: 512,
+    frameCount: 9,
+    estimatedCost: 0.003,
+    label: 'Preview',
+    description: '512×512, 9 frames - Quick test'
+  },
+  standard: {
+    resolution: 1024,
+    frameCount: 9,
+    estimatedCost: 0.006,
+    label: 'Standard',
+    description: '1024×1024, 9 frames - High quality'
+  },
+  hd: {
+    resolution: 1024,
+    frameCount: 16,
+    estimatedCost: 0.006,
+    label: 'HD',
+    description: '1024×1024, 16 frames - Maximum quality'
+  }
+};
+
 export interface AnimationOptions {
   variantId: string;
-  frameCount: 9 | 16;
+  frameCount: 4 | 9 | 16;
   frameDuration: number;
   isLooping: boolean;
   effectIntensity: 'low' | 'medium' | 'high';
   modifier: AnimationModifier;
   enableAntiJitter: boolean;
+  qualityTier: QualityTier;
 }
 
 export interface AnimationRequest {
@@ -299,4 +341,41 @@ export interface Frame {
   y: number;
   width: number;
   height: number;
+}
+
+// Frame metadata for GIF generation context
+export interface FrameMetadata {
+  frameNumber: number;
+  timestamp: number; // Duration in ms at which this frame should appear
+  gridPosition: { row: number; col: number }; // Position in sprite sheet
+  sourceRect: { x: number; y: number; width: number; height: number }; // Source coordinates
+  isKeyFrame?: boolean; // Optional flag for important frames
+  transformations?: {
+    antiJitterOffset?: { x: number; y: number };
+    cropRect?: { x: number; y: number; width: number; height: number };
+  };
+}
+
+export interface AnimationMetadata {
+  version: string; // Metadata schema version
+  generatedAt: string; // ISO timestamp
+  sourceImageId: string;
+  sourceImageName: string;
+  variantId: string;
+  variantName?: string;
+  qualityTier: QualityTier;
+  resolution: number;
+  totalFrames: number;
+  frameDuration: number;
+  totalDuration: number; // Total animation duration in ms
+  isLooping: boolean;
+  gridSize: number; // e.g., 2 for 2x2, 3 for 3x3
+  frames: FrameMetadata[];
+  generationOptions: {
+    effectIntensity: 'low' | 'medium' | 'high';
+    modifier: AnimationModifier;
+    enableAntiJitter: boolean;
+  };
+  costEstimate: number; // Estimated generation cost in dollars
+  spriteSheetUrl?: string; // Data URL of the sprite sheet
 }
