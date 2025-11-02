@@ -1,6 +1,7 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
+ * Clear Seas Solution - Holographic Cyberpunk Theme
 */
 
 import React, { useState, useEffect } from 'react';
@@ -47,14 +48,13 @@ const CostTracker: React.FC<CostTrackerProps> = ({
 
   return (
     <div className="cost-tracker">
-      {/* Compact View */}
+      {/* Compact View - Skeuomorphic embossed panel */}
       <div
         className="cost-tracker-header"
         onClick={() => setExpanded(!expanded)}
-        style={{ cursor: 'pointer' }}
       >
         <div className="cost-tracker-summary">
-          <span className="cost-label">Session Cost:</span>
+          <span className="cost-label">⚡ Session Cost:</span>
           <span className="cost-value">{formatCost(stats.totalCost)}</span>
           {pendingGenerations > 0 && (
             <span className="cost-estimate">
@@ -68,25 +68,25 @@ const CostTracker: React.FC<CostTrackerProps> = ({
       {/* Expanded View */}
       {expanded && (
         <div className="cost-tracker-details">
-          {/* Free Tier Status */}
+          {/* Free Tier Status - Glass morphism card */}
           <div className="free-tier-status">
-            <h4>Free Tier Status</h4>
+            <h4>🎯 Free Tier Status</h4>
             <div className="free-tier-limits">
               <div className="limit-item">
                 <span>Nano Remaining:</span>
-                <span className={freeTierStatus.nanoRemaining > 0 ? 'available' : 'depleted'}>
+                <span className={`limit-value ${freeTierStatus.nanoRemaining > 0 ? 'available' : 'depleted'}`}>
                   {freeTierStatus.nanoRemaining}/10
                 </span>
               </div>
               <div className="limit-item">
                 <span>Standard Remaining:</span>
-                <span className={freeTierStatus.standardRemaining > 0 ? 'available' : 'depleted'}>
+                <span className={`limit-value ${freeTierStatus.standardRemaining > 0 ? 'available' : 'depleted'}`}>
                   {freeTierStatus.standardRemaining}/2
                 </span>
               </div>
               <div className="limit-item">
                 <span>Budget Remaining:</span>
-                <span className={freeTierStatus.costRemaining > 0 ? 'available' : 'depleted'}>
+                <span className={`limit-value ${freeTierStatus.costRemaining > 0 ? 'available' : 'depleted'}`}>
                   {formatCost(freeTierStatus.costRemaining)}
                 </span>
               </div>
@@ -98,86 +98,88 @@ const CostTracker: React.FC<CostTrackerProps> = ({
             )}
           </div>
 
-          {/* Usage Breakdown */}
+          {/* Usage Breakdown - Holographic table */}
           <div className="usage-breakdown">
-            <h4>Usage Breakdown</h4>
-            <table className="usage-table">
-              <thead>
-                <tr>
-                  <th>Tier</th>
-                  <th>Count</th>
-                  <th>Cost</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Nano</td>
-                  <td>{stats.generationsByTier.nano}</td>
-                  <td>{formatCost(stats.costByTier.nano)}</td>
-                </tr>
-                <tr>
-                  <td>Preview</td>
-                  <td>{stats.generationsByTier.preview}</td>
-                  <td>{formatCost(stats.costByTier.preview)}</td>
-                </tr>
-                <tr>
-                  <td>Standard</td>
-                  <td>{stats.generationsByTier.standard}</td>
-                  <td>{formatCost(stats.costByTier.standard)}</td>
-                </tr>
-                <tr>
-                  <td>HD</td>
-                  <td>{stats.generationsByTier.hd}</td>
-                  <td>{formatCost(stats.costByTier.hd)}</td>
-                </tr>
-                <tr className="total-row">
-                  <td><strong>Total</strong></td>
-                  <td><strong>{stats.totalGenerations}</strong></td>
-                  <td><strong>{formatCost(stats.totalCost)}</strong></td>
-                </tr>
-              </tbody>
-            </table>
+            <h4>📊 Usage Breakdown</h4>
+            <div className="usage-table-container">
+              <table className="usage-table">
+                <thead>
+                  <tr>
+                    <th>Tier</th>
+                    <th>Count</th>
+                    <th>Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><span className="tier-badge nano">Nano</span></td>
+                    <td>{stats.generationsByTier.nano}</td>
+                    <td className="cost-cell">{formatCost(stats.costByTier.nano)}</td>
+                  </tr>
+                  <tr>
+                    <td><span className="tier-badge preview">Preview</span></td>
+                    <td>{stats.generationsByTier.preview}</td>
+                    <td className="cost-cell">{formatCost(stats.costByTier.preview)}</td>
+                  </tr>
+                  <tr>
+                    <td><span className="tier-badge standard">Standard</span></td>
+                    <td>{stats.generationsByTier.standard}</td>
+                    <td className="cost-cell">{formatCost(stats.costByTier.standard)}</td>
+                  </tr>
+                  <tr>
+                    <td><span className="tier-badge hd">HD</span></td>
+                    <td>{stats.generationsByTier.hd}</td>
+                    <td className="cost-cell">{formatCost(stats.costByTier.hd)}</td>
+                  </tr>
+                  <tr className="total-row">
+                    <td><strong>Total</strong></td>
+                    <td><strong>{stats.totalGenerations}</strong></td>
+                    <td className="cost-cell"><strong>{formatCost(stats.totalCost)}</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          {/* Current Selection */}
+          {/* Current Selection - Skeuomorphic raised card */}
           <div className="current-selection">
-            <h4>Current Quality Tier</h4>
+            <h4>🎨 Current Quality Tier</h4>
             <div className="tier-info">
               <div className="tier-name">{QUALITY_TIERS[currentQualityTier].label}</div>
               <div className="tier-description">
                 {QUALITY_TIERS[currentQualityTier].description}
               </div>
               <div className="tier-cost">
-                Cost per generation: {formatCost(currentCost)}
+                Cost per generation: <span className="cost-highlight">{formatCost(currentCost)}</span>
               </div>
             </div>
           </div>
 
-          {/* Actions */}
+          {/* Actions - Neon buttons */}
           <div className="cost-tracker-actions">
             <button
               onClick={() => setShowSummary(true)}
-              className="btn-secondary"
+              className="btn-holographic"
             >
-              View Summary
+              <span className="btn-text">View Summary</span>
             </button>
             <button
               onClick={handleReset}
-              className="btn-danger"
+              className="btn-danger-neon"
             >
-              Reset Stats
+              <span className="btn-text">Reset Stats</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* Summary Modal */}
+      {/* Summary Modal - Glass morphism overlay */}
       {showSummary && (
         <div className="modal-overlay" onClick={() => setShowSummary(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>Cost Summary</h3>
+            <h3 className="modal-title">💎 Cost Summary</h3>
             <pre className="summary-text">{getCostSummary()}</pre>
-            <button onClick={() => setShowSummary(false)} className="btn-primary">
+            <button onClick={() => setShowSummary(false)} className="btn-close">
               Close
             </button>
           </div>
@@ -185,130 +187,197 @@ const CostTracker: React.FC<CostTrackerProps> = ({
       )}
 
       <style>{`
+        /* Cost Tracker - Holographic Cyberpunk Theme */
         .cost-tracker {
-          background: #f8f9fa;
-          border: 1px solid #dee2e6;
-          border-radius: 8px;
-          padding: 12px;
-          margin: 12px 0;
+          position: relative;
+          background: linear-gradient(135deg, rgba(176, 38, 255, 0.1) 0%, rgba(255, 0, 110, 0.05) 100%);
+          border: 2px solid transparent;
+          background-clip: padding-box;
+          border-radius: 16px;
+          padding: 16px;
+          margin: 16px 0;
           font-size: 14px;
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          box-shadow: 0 8px 32px rgba(176, 38, 255, 0.3),
+                      inset 0 1px 0 rgba(255, 255, 255, 0.1);
         }
 
+        /* Skeuomorphic embossed header */
         .cost-tracker-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 4px 0;
+          padding: 12px;
+          cursor: pointer;
+          border-radius: 12px;
+          background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(10, 10, 10, 0.9));
+          box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.05),
+                      inset 0 -2px 4px rgba(0, 0, 0, 0.5),
+                      0 4px 12px rgba(176, 38, 255, 0.2);
+          transition: all 0.3s ease;
+        }
+
+        .cost-tracker-header:hover {
+          background: linear-gradient(145deg, rgba(176, 38, 255, 0.15), rgba(255, 0, 110, 0.1));
+          box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.1),
+                      inset 0 -2px 4px rgba(0, 0, 0, 0.5),
+                      0 6px 20px rgba(255, 0, 110, 0.4);
         }
 
         .cost-tracker-summary {
           display: flex;
-          gap: 12px;
+          gap: 16px;
           align-items: center;
         }
 
         .cost-label {
-          font-weight: 500;
-          color: #495057;
+          font-weight: 600;
+          color: #E0E0E0;
+          text-shadow: 0 0 10px rgba(176, 38, 255, 0.5);
         }
 
         .cost-value {
           font-weight: 700;
-          font-size: 16px;
-          color: #212529;
+          font-size: 18px;
+          background: linear-gradient(135deg, #B026FF 0%, #FF006E 50%, #FFBE0B 100%);
+          background-size: 200% 200%;
+          animation: holoShimmer 3s ease-in-out infinite;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          filter: drop-shadow(0 0 8px rgba(176, 38, 255, 0.6));
         }
 
         .cost-estimate {
-          color: #6c757d;
+          color: #FFBE0B;
           font-size: 12px;
+          text-shadow: 0 0 10px rgba(255, 190, 11, 0.6);
         }
 
         .expand-icon {
-          transition: transform 0.2s;
-          font-size: 12px;
-          color: #6c757d;
+          transition: transform 0.3s ease;
+          font-size: 14px;
+          color: #B026FF;
+          filter: drop-shadow(0 0 6px rgba(176, 38, 255, 0.8));
         }
 
         .expand-icon.expanded {
           transform: rotate(180deg);
+          color: #FF006E;
+          filter: drop-shadow(0 0 6px rgba(255, 0, 110, 0.8));
         }
 
         .cost-tracker-details {
-          margin-top: 16px;
-          padding-top: 16px;
-          border-top: 1px solid #dee2e6;
+          margin-top: 20px;
+          padding-top: 20px;
+          border-top: 1px solid rgba(176, 38, 255, 0.3);
         }
 
         .cost-tracker-details h4 {
-          margin: 0 0 12px 0;
-          font-size: 14px;
-          font-weight: 600;
-          color: #212529;
+          margin: 0 0 16px 0;
+          font-size: 16px;
+          font-weight: 700;
+          color: #FFFFFF;
+          text-shadow: 0 0 12px rgba(255, 0, 110, 0.6);
         }
 
+        /* Glass morphism free tier card */
         .free-tier-status {
-          margin-bottom: 16px;
+          margin-bottom: 24px;
+          background: rgba(0, 0, 0, 0.6);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border: 1px solid rgba(176, 38, 255, 0.3);
+          border-radius: 12px;
+          padding: 16px;
+          box-shadow: 0 4px 24px rgba(255, 0, 110, 0.2);
         }
 
         .free-tier-limits {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 12px;
         }
 
+        /* Skeuomorphic embossed limit items */
         .limit-item {
           display: flex;
           justify-content: space-between;
-          padding: 6px 8px;
-          background: white;
-          border-radius: 4px;
+          padding: 12px 16px;
+          background: linear-gradient(145deg, rgba(10, 10, 10, 0.8), rgba(26, 26, 26, 0.6));
+          border-radius: 8px;
+          box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6),
+                      inset 0 -1px 2px rgba(255, 255, 255, 0.05),
+                      0 2px 8px rgba(176, 38, 255, 0.15);
+          color: #E0E0E0;
         }
 
-        .limit-item span.available {
-          color: #28a745;
-          font-weight: 600;
+        .limit-value {
+          font-weight: 700;
+          font-size: 16px;
         }
 
-        .limit-item span.depleted {
-          color: #dc3545;
-          font-weight: 600;
+        .limit-value.available {
+          color: #FFBE0B;
+          text-shadow: 0 0 10px rgba(255, 190, 11, 0.8);
+        }
+
+        .limit-value.depleted {
+          color: #FF006E;
+          text-shadow: 0 0 10px rgba(255, 0, 110, 0.8);
         }
 
         .limit-warning {
-          margin-top: 8px;
-          padding: 8px;
-          background: #fff3cd;
-          border: 1px solid #ffc107;
-          border-radius: 4px;
-          color: #856404;
+          margin-top: 12px;
+          padding: 12px;
+          background: rgba(255, 0, 110, 0.1);
+          border: 1px solid #FF006E;
+          border-radius: 8px;
+          color: #FFBE0B;
           font-size: 13px;
+          text-shadow: 0 0 8px rgba(255, 190, 11, 0.6);
+          box-shadow: 0 0 20px rgba(255, 0, 110, 0.3);
         }
 
+        /* Holographic table */
         .usage-breakdown {
-          margin-bottom: 16px;
+          margin-bottom: 24px;
+        }
+
+        .usage-table-container {
+          border-radius: 12px;
+          overflow: hidden;
+          border: 1px solid rgba(176, 38, 255, 0.4);
+          box-shadow: 0 4px 24px rgba(176, 38, 255, 0.3);
         }
 
         .usage-table {
           width: 100%;
           border-collapse: collapse;
-          background: white;
-          border-radius: 4px;
-          overflow: hidden;
+          background: rgba(10, 10, 10, 0.8);
         }
 
         .usage-table th,
         .usage-table td {
-          padding: 8px 12px;
+          padding: 12px 16px;
           text-align: left;
         }
 
         .usage-table thead {
-          background: #e9ecef;
-          font-weight: 600;
+          background: linear-gradient(135deg, rgba(176, 38, 255, 0.3) 0%, rgba(255, 0, 110, 0.2) 100%);
+          font-weight: 700;
+          color: #FFFFFF;
+          text-shadow: 0 0 10px rgba(176, 38, 255, 0.8);
         }
 
         .usage-table tbody tr {
-          border-bottom: 1px solid #f1f3f5;
+          border-bottom: 1px solid rgba(176, 38, 255, 0.2);
+          transition: all 0.3s ease;
+        }
+
+        .usage-table tbody tr:hover {
+          background: rgba(176, 38, 255, 0.1);
         }
 
         .usage-table tbody tr:last-child {
@@ -316,118 +385,263 @@ const CostTracker: React.FC<CostTrackerProps> = ({
         }
 
         .usage-table .total-row {
-          background: #f8f9fa;
+          background: linear-gradient(135deg, rgba(255, 0, 110, 0.2) 0%, rgba(255, 190, 11, 0.15) 100%);
+          font-weight: 700;
+          border-top: 2px solid rgba(176, 38, 255, 0.5);
         }
 
+        /* Tier badges with neon glow */
+        .tier-badge {
+          display: inline-block;
+          padding: 4px 12px;
+          border-radius: 6px;
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .tier-badge.nano {
+          background: rgba(176, 38, 255, 0.2);
+          color: #B026FF;
+          border: 1px solid #B026FF;
+          box-shadow: 0 0 10px rgba(176, 38, 255, 0.5);
+        }
+
+        .tier-badge.preview {
+          background: rgba(255, 0, 110, 0.2);
+          color: #FF006E;
+          border: 1px solid #FF006E;
+          box-shadow: 0 0 10px rgba(255, 0, 110, 0.5);
+        }
+
+        .tier-badge.standard {
+          background: rgba(255, 190, 11, 0.2);
+          color: #FFBE0B;
+          border: 1px solid #FFBE0B;
+          box-shadow: 0 0 10px rgba(255, 190, 11, 0.5);
+        }
+
+        .tier-badge.hd {
+          background: linear-gradient(135deg, rgba(176, 38, 255, 0.2) 0%, rgba(255, 0, 110, 0.2) 100%);
+          color: #FFFFFF;
+          border: 1px solid transparent;
+          border-image: linear-gradient(135deg, #B026FF 0%, #FF006E 100%) 1;
+          box-shadow: 0 0 15px rgba(176, 38, 255, 0.6);
+        }
+
+        .cost-cell {
+          color: #FFBE0B;
+          font-weight: 600;
+          text-shadow: 0 0 8px rgba(255, 190, 11, 0.6);
+        }
+
+        /* Skeuomorphic raised current selection card */
         .current-selection {
-          margin-bottom: 16px;
+          margin-bottom: 24px;
         }
 
         .tier-info {
-          background: white;
-          padding: 12px;
-          border-radius: 4px;
+          background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(10, 10, 10, 0.9));
+          padding: 16px;
+          border-radius: 12px;
+          border: 1px solid rgba(176, 38, 255, 0.3);
+          box-shadow: 0 6px 20px rgba(176, 38, 255, 0.4),
+                      inset 0 1px 0 rgba(255, 255, 255, 0.1);
         }
 
         .tier-name {
-          font-weight: 600;
-          font-size: 15px;
-          margin-bottom: 4px;
+          font-weight: 700;
+          font-size: 18px;
+          margin-bottom: 8px;
+          background: linear-gradient(135deg, #B026FF 0%, #FF006E 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
         }
 
         .tier-description {
-          color: #6c757d;
+          color: #808080;
           font-size: 13px;
-          margin-bottom: 8px;
+          margin-bottom: 12px;
         }
 
         .tier-cost {
-          color: #28a745;
-          font-weight: 600;
-          font-size: 13px;
+          color: #E0E0E0;
+          font-weight: 500;
+          font-size: 14px;
         }
 
+        .cost-highlight {
+          color: #FFBE0B;
+          font-weight: 700;
+          text-shadow: 0 0 10px rgba(255, 190, 11, 0.8);
+        }
+
+        /* Neon holographic buttons */
         .cost-tracker-actions {
           display: flex;
-          gap: 8px;
+          gap: 12px;
         }
 
         .cost-tracker-actions button {
+          position: relative;
           flex: 1;
-          padding: 8px;
+          padding: 12px 24px;
           border: none;
-          border-radius: 4px;
+          border-radius: 10px;
           cursor: pointer;
-          font-size: 13px;
-          font-weight: 500;
+          font-size: 14px;
+          font-weight: 700;
+          overflow: hidden;
+          transition: all 0.3s ease;
         }
 
-        .btn-secondary {
-          background: #6c757d;
-          color: white;
+        .btn-holographic {
+          background: linear-gradient(135deg, #B026FF 0%, #FF006E 50%, #FFBE0B 100%);
+          background-size: 200% 200%;
+          animation: holoShimmer 3s ease-in-out infinite;
+          box-shadow: 0 0 20px rgba(176, 38, 255, 0.6),
+                      inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
 
-        .btn-secondary:hover {
-          background: #5a6268;
+        .btn-holographic:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 0 30px rgba(176, 38, 255, 0.8),
+                      0 6px 20px rgba(255, 0, 110, 0.6),
+                      inset 0 1px 0 rgba(255, 255, 255, 0.3);
         }
 
-        .btn-danger {
-          background: #dc3545;
-          color: white;
+        .btn-danger-neon {
+          background: linear-gradient(145deg, rgba(255, 0, 110, 0.8), rgba(255, 0, 110, 0.6));
+          box-shadow: 0 0 20px rgba(255, 0, 110, 0.5),
+                      inset 0 2px 4px rgba(255, 255, 255, 0.1),
+                      inset 0 -2px 4px rgba(0, 0, 0, 0.5);
         }
 
-        .btn-danger:hover {
-          background: #c82333;
+        .btn-danger-neon:hover {
+          transform: translateY(-2px);
+          background: linear-gradient(145deg, rgba(255, 0, 110, 1), rgba(255, 0, 110, 0.8));
+          box-shadow: 0 0 30px rgba(255, 0, 110, 0.8),
+                      0 6px 20px rgba(255, 0, 110, 0.6),
+                      inset 0 2px 4px rgba(255, 255, 255, 0.2);
         }
 
-        .btn-primary {
-          background: #007bff;
-          color: white;
-          padding: 8px 16px;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          font-weight: 500;
+        .btn-text {
+          position: relative;
+          z-index: 1;
+          color: #FFFFFF;
+          text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
         }
 
-        .btn-primary:hover {
-          background: #0056b3;
-        }
-
+        /* Glass morphism modal */
         .modal-overlay {
           position: fixed;
           top: 0;
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(0, 0, 0, 0.5);
+          background: rgba(0, 0, 0, 0.85);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
           display: flex;
           align-items: center;
           justify-content: center;
           z-index: 1000;
+          animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
         }
 
         .modal-content {
-          background: white;
-          padding: 24px;
-          border-radius: 8px;
+          background: linear-gradient(145deg, rgba(26, 26, 26, 0.95), rgba(10, 10, 10, 0.95));
+          backdrop-filter: blur(40px);
+          -webkit-backdrop-filter: blur(40px);
+          padding: 32px;
+          border-radius: 20px;
           max-width: 600px;
           max-height: 80vh;
           overflow-y: auto;
+          border: 2px solid transparent;
+          background-clip: padding-box;
+          box-shadow: 0 0 40px rgba(176, 38, 255, 0.6),
+                      0 0 80px rgba(255, 0, 110, 0.4),
+                      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+          animation: modalSlideIn 0.4s ease;
         }
 
-        .modal-content h3 {
+        @keyframes modalSlideIn {
+          from {
+            transform: translateY(-50px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+
+        .modal-title {
           margin-top: 0;
+          margin-bottom: 24px;
+          background: linear-gradient(135deg, #B026FF 0%, #FF006E 50%, #FFBE0B 100%);
+          background-size: 200% 200%;
+          animation: holoShimmer 3s ease-in-out infinite;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          font-size: 28px;
+          font-weight: 700;
         }
 
         .summary-text {
-          background: #f8f9fa;
-          padding: 16px;
-          border-radius: 4px;
-          font-size: 12px;
+          background: rgba(0, 0, 0, 0.6);
+          padding: 20px;
+          border-radius: 12px;
+          font-size: 13px;
           overflow-x: auto;
           white-space: pre-wrap;
-          margin: 16px 0;
+          margin: 20px 0;
+          color: #E0E0E0;
+          border: 1px solid rgba(176, 38, 255, 0.3);
+          box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.6);
+        }
+
+        .btn-close {
+          width: 100%;
+          padding: 12px 24px;
+          background: linear-gradient(135deg, #B026FF 0%, #FF006E 100%);
+          background-size: 200% 200%;
+          animation: holoShimmer 3s ease-in-out infinite;
+          color: #FFFFFF;
+          border: none;
+          border-radius: 10px;
+          cursor: pointer;
+          font-weight: 700;
+          font-size: 16px;
+          box-shadow: 0 0 20px rgba(176, 38, 255, 0.6),
+                      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+          transition: all 0.3s ease;
+        }
+
+        .btn-close:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 0 30px rgba(176, 38, 255, 0.8),
+                      0 6px 20px rgba(255, 0, 110, 0.6);
+        }
+
+        @media (max-width: 768px) {
+          .modal-content {
+            max-width: 90vw;
+            padding: 24px;
+          }
         }
       `}</style>
     </div>
