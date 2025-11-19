@@ -300,3 +300,70 @@ export interface Frame {
   width: number;
   height: number;
 }
+
+// ============================================================================
+// Music-Responsive Animation Types
+// ============================================================================
+
+/**
+ * Choreography styles for music-responsive animations
+ */
+export type ChoreographyStyle =
+  | 'chill'       // Gentle, smooth transitions on major beats
+  | 'bounce'      // Energetic, reactive to all beats
+  | 'strobe'      // Rapid changes on strong beats
+  | 'logo-safe'   // Subtle, professional (mostly holds anchor)
+  | 'glitch'      // Chaotic, fragmented
+  | 'pulse'       // Rhythmic breathing effect
+  | 'wave';       // Smooth cycling through frames
+
+/**
+ * Music-enhanced animation request
+ */
+export interface MusicAnimationRequest extends AnimationRequest {
+  audioUrl?: string;              // Optional audio file URL
+  choreographyStyle?: ChoreographyStyle;
+  musicIntensity?: number;        // 0-1, how responsive to music
+  clipDuration?: number;          // Desired output duration in seconds
+}
+
+/**
+ * Audio source information
+ */
+export interface AudioSource {
+  type: 'file' | 'youtube' | 'microphone';
+  url?: string;                   // For file/youtube
+  title?: string;
+  duration: number;               // Total duration in seconds
+}
+
+/**
+ * Music analysis result
+ */
+export interface MusicAnalysis {
+  bpm: number;                    // Detected beats per minute
+  beats: number[];                // Array of beat timestamps
+  tempo: 'slow' | 'medium' | 'fast';
+  energy: 'low' | 'medium' | 'high';
+  sections?: {                    // Optional section detection
+    start: number;
+    end: number;
+    label: string;                // intro, verse, chorus, drop, etc.
+  }[];
+}
+
+/**
+ * Complete music-responsive project
+ */
+export interface MusicProject {
+  id: string;
+  name: string;
+  sourceImage: UploadedImage;
+  audioSource?: AudioSource;
+  animationOptions: AnimationOptions;
+  choreographyStyle: ChoreographyStyle;
+  musicIntensity: number;
+  clipDuration: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
