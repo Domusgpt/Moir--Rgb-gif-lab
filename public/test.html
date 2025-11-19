@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Page - Music Animator</title>
+    <style>
+        body {
+            background: #000;
+            color: #fff;
+            font-family: system-ui, -apple-system, sans-serif;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 { color: #a78bfa; }
+        .status { padding: 15px; background: #1a1a1a; border-radius: 8px; margin: 10px 0; }
+        .success { border-left: 4px solid #10b981; }
+        .info { border-left: 4px solid #3b82f6; }
+        pre { background: #111; padding: 10px; border-radius: 4px; overflow: auto; }
+        a { color: #60a5fa; }
+    </style>
+</head>
+<body>
+    <h1>🎵 Music-Responsive GIF Animator - Test Page</h1>
+
+    <div class="status success">
+        <h2>✅ Deployment Status: Working!</h2>
+        <p>If you can see this page, GitHub Pages deployment is successful.</p>
+    </div>
+
+    <div class="status info">
+        <h3>🔍 Debug Information</h3>
+        <pre id="debug-info">Loading...</pre>
+    </div>
+
+    <div class="status info">
+        <h3>📍 Current Location</h3>
+        <p><strong>URL:</strong> <span id="current-url"></span></p>
+        <p><strong>Origin:</strong> <span id="origin"></span></p>
+        <p><strong>Pathname:</strong> <span id="pathname"></span></p>
+    </div>
+
+    <div class="status info">
+        <h3>🧪 Next Steps</h3>
+        <ol>
+            <li>The main app should be at: <a href="./index.html">./index.html</a></li>
+            <li>Open browser DevTools (F12) and check Console for errors</li>
+            <li>Check Network tab to see if JavaScript files are loading</li>
+            <li>Look for any 404 errors on asset files</li>
+        </ol>
+    </div>
+
+    <div class="status info">
+        <h3>🔗 Links</h3>
+        <ul>
+            <li><a href="./index.html">Main App (index.html)</a></li>
+            <li><a href="./dist/index.html">Dist folder (if exists)</a></li>
+            <li><a href="https://github.com/Domusgpt/Moir--Rgb-gif-lab">GitHub Repository</a></li>
+            <li><a href="https://github.com/Domusgpt/Moir--Rgb-gif-lab/actions">GitHub Actions</a></li>
+        </ul>
+    </div>
+
+    <script>
+        // Display debug info
+        document.getElementById('current-url').textContent = window.location.href;
+        document.getElementById('origin').textContent = window.location.origin;
+        document.getElementById('pathname').textContent = window.location.pathname;
+
+        const debugInfo = {
+            userAgent: navigator.userAgent,
+            screenSize: `${window.screen.width}x${window.screen.height}`,
+            timestamp: new Date().toISOString(),
+            baseURL: window.location.origin + window.location.pathname
+        };
+
+        document.getElementById('debug-info').textContent = JSON.stringify(debugInfo, null, 2);
+
+        console.log('🔍 Test page loaded successfully');
+        console.log('Debug info:', debugInfo);
+    </script>
+</body>
+</html>
