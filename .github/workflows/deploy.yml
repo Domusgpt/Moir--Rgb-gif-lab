@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - claude/music-responsive-gif-animator-*
   workflow_dispatch:
 
 permissions:
