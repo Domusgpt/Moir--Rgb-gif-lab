@@ -108,6 +108,39 @@ interface AudioFeatures {
 - Beat indicator overlay
 - Frame counter display
 
+#### 6. **VideoExportModal** (`components/VideoExportModal.tsx`) ⭐ NEW
+- Full-featured video export interface
+- Format selection (WebM/MP4) with browser compatibility check
+- Quality preset selector (Low/Medium/High/Ultra)
+- FPS slider (12-60 FPS)
+- Audio track toggle
+- Real-time file size estimation
+- Export progress tracking with stage indicators
+- Download functionality
+- Browser capability detection
+- Error handling and user feedback
+
+### Export Services
+
+#### **VideoExportService** (`services/videoExportService.ts`) ⭐ NEW
+- MediaRecorder API integration for video+audio export
+- **Format support:**
+  - WebM with VP9/VP8 codecs
+  - MP4 with H.264 codec
+- **Quality presets:**
+  - Low: 480p @ 1 Mbps video, 96 kbps audio
+  - Medium: 720p @ 2.5 Mbps video, 128 kbps audio
+  - High: 1080p @ 5 Mbps video, 192 kbps audio
+  - Ultra: 1920p @ 10 Mbps video, 256 kbps audio
+- **Key Features:**
+  - Canvas-to-video rendering
+  - Frame-by-frame synchronization with audio
+  - Configurable FPS and bitrates
+  - File size estimation
+  - Progress callbacks
+  - Browser support detection
+  - Download helper
+
 ### App Integration
 
 #### New "Music" Tab (`App.tsx`)
@@ -117,6 +150,7 @@ interface AudioFeatures {
   3. **Set duration** → DurationSelector
   4. **Generate** → Orchestrator creates timeline
   5. **Preview** → MusicResponsePlayer shows result
+  6. **Export** → VideoExportModal for video+audio download ⭐ NEW
 
 - Progressive disclosure (steps unlock as you complete them)
 - Reuses frames from existing "Setup" workflow
@@ -201,26 +235,21 @@ User exports: MP4 with audio track (future feature)
 | Choreography Styles | 7 styles | ✅ Complete |
 | Frame Reuse | Pattern-based | ✅ Complete |
 | Audio Upload | File API | ✅ Complete |
+| Video Export with Audio | MediaRecorder API | ✅ Complete |
 | YouTube Support | Stub only | ⚠️ Requires backend |
-| Video Export | Not implemented | ❌ Next phase |
 | Backend Integration | Not implemented | ❌ Next phase |
 
 ## 🔮 Next Steps (Phase 2+)
 
 ### High Priority
 
-1. **Video Export with Audio Track**
-   - Use MediaRecorder API or canvas → video encoding
-   - Mux audio track into MP4/WebM output
-   - Handle format compatibility (Safari, Chrome, Firefox)
-
-2. **Improved Audio Analysis**
+1. **Improved Audio Analysis**
    - Switch to OfflineAudioContext for faster, non-real-time analysis
    - Add onset detection library (e.g., Meyda.js)
    - Section detection (intro/verse/chorus/drop)
    - Intensity curve smoothing
 
-3. **YouTube Audio Extraction**
+2. **YouTube Audio Extraction**
    - Backend service (Node.js + ytdl-core or yt-dlp)
    - Cloud Function on GCP
    - Stream audio directly from URL
@@ -273,7 +302,7 @@ User exports: MP4 with audio track (future feature)
 ✅ Clean git history
 
 ### What Could Improve:
-⚠️ Large bundle size (541KB - needs code splitting)
+⚠️ Large bundle size (555KB - needs code splitting)
 ⚠️ No unit tests yet
 ⚠️ Placeholder YouTube/microphone features
 ⚠️ Audio analysis is synchronous (blocks playback)

@@ -98,11 +98,22 @@ Get a Gemini API key from [Google AI Studio](https://makersuite.google.com/app/a
    - Real-time frequency visualization
    - Beat indicator pulses on hits
 
-### Step 3: Results Tab - Export
+6. **Export video with audio:** ⭐ NEW
+   - Click "💾 Export Video with Audio" button
+   - Choose format (WebM or MP4)
+   - Select quality (Low/Medium/High/Ultra)
+   - Adjust FPS (12-60)
+   - Toggle audio track on/off
+   - Click "🎬 Export Video"
+   - Wait for rendering (progress bar shows status)
+   - Download your music-responsive video!
+
+### Step 3: Results Tab - View Completed
 
 - View all completed animations
 - Click to view full-screen
-- Export options (GIF, MP4 - *MP4 with audio coming soon*)
+- Export GIF animations from the Results tab
+- Export music-responsive videos from the Music tab ⭐
 
 ---
 
@@ -225,10 +236,10 @@ npm run build
 
 | Browser | Audio Analysis | File Upload | Video Export |
 |---------|---------------|-------------|--------------|
-| Chrome 90+ | ✅ Full | ✅ Full | 🔜 Coming |
-| Firefox 88+ | ✅ Full | ✅ Full | 🔜 Coming |
-| Safari 14+ | ✅ Full | ✅ Full | 🔜 Coming |
-| Edge 90+ | ✅ Full | ✅ Full | 🔜 Coming |
+| Chrome 90+ | ✅ Full | ✅ Full | ✅ WebM/MP4 |
+| Firefox 88+ | ✅ Full | ✅ Full | ✅ WebM |
+| Safari 14+ | ✅ Full | ✅ Full | ⚠️ Limited |
+| Edge 90+ | ✅ Full | ✅ Full | ✅ WebM/MP4 |
 
 ---
 
@@ -236,12 +247,11 @@ npm run build
 
 Coming in future updates:
 
-- **Video export with audio** (MP4/WebM)
-- **YouTube URL support** (extract audio)
-- **Advanced beat detection** (onset analysis)
+- **YouTube URL support** (extract audio from links)
+- **Advanced beat detection** (onset analysis, section detection)
 - **Timeline editor** (manual frame adjustment)
-- **Multi-layer composition**
-- **Backend integration** (save projects, user accounts)
+- **Multi-layer composition** (combine multiple animated objects)
+- **Backend integration** (save projects, user accounts, cloud rendering)
 
 ---
 
