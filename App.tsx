@@ -5,7 +5,7 @@
 
 
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { AnimationCategory, ANIMATION_DATA, UploadedImage, AnimationModifier, MODIFIERS, AnimationRequest, AnimationOptions } from './types';
+import { AnimationCategory, ANIMATION_DATA, UploadedImage, AnimationModifier, MODIFIERS, AnimationRequest, AnimationOptions, ChoreographyStyle } from './types';
 import { generateAnimationAssets, AnimationAssets } from './services/geminiService';
 import { buildCreativeInstruction } from './prompts';
 import AnimationPlayer from './components/AnimationPlayer';
@@ -15,6 +15,15 @@ import { v4 as uuidv4 } from 'uuid';
 import { DEFAULT_PREVIEW_IMAGE } from './assets/default-image';
 import { createGifFromFrames } from './services/gifService';
 import BananaLoader from './components/BananaLoader';
+import { MusicUploader } from './components/MusicUploader';
+import { AudioPlayer } from './components/AudioPlayer';
+import { ChoreographyStyleSelector } from './components/ChoreographyStyleSelector';
+import { DurationSelector } from './components/DurationSelector';
+import { MusicResponsePlayer } from './components/MusicResponsePlayer';
+import { VideoExportModal } from './components/VideoExportModal';
+import { MusicService, LoadedAudio } from './services/musicService';
+import { MusicAnimationOrchestrator, AnimationProgress } from './services/musicAnimationOrchestrator';
+import { FrameTimeline } from './services/frameChoreographer';
 
 
 const resizeImage = (dataUrl: string, maxWidth: number, maxHeight: number): Promise<string> => {
@@ -61,7 +70,18 @@ const resizeImage = (dataUrl: string, maxWidth: number, maxHeight: number): Prom
 };
 
 const App: React.FC = () => {
-  const [currentTab, setCurrentTab] = useState<'setup' | 'results'>('setup');
+  const [currentTab, setCurrentTab] = useState<'setup' | 'results' | 'music'>('setup');
+
+  // Music-responsive animation state
+  const [loadedAudio, setLoadedAudio] = useState<LoadedAudio | null>(null);
+  const [choreographyStyle, setChoreographyStyle] = useState<ChoreographyStyle>('bounce');
+  const [musicIntensity, setMusicIntensity] = useState<number>(0.7);
+  const [clipDuration, setClipDuration] = useState<number>(15);
+  const [musicTimeline, setMusicTimeline] = useState<FrameTimeline | null>(null);
+  const [isMusicProcessing, setIsMusicProcessing] = useState(false);
+  const [musicProcessingProgress, setMusicProcessingProgress] = useState<AnimationProgress | null>(null);
+  const [showVideoExportModal, setShowVideoExportModal] = useState(false);
+  const orchestratorRef = useRef<MusicAnimationOrchestrator | null>(null);
 
   const [animationRequests, setAnimationRequests] = useState<AnimationRequest[]>([]);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
@@ -610,6 +630,9 @@ IMAGE OUTPUT REQUIREMENTS:
           <button onClick={() => setCurrentTab('setup')} className={`px-4 py-2 text-sm font-medium transition-colors ${currentTab === 'setup' ? 'border-b-2 border-indigo-500 text-white' : 'text-gray-400 hover:text-white'}`}>
             Setup
           </button>
+          <button onClick={() => setCurrentTab('music')} className={`px-4 py-2 text-sm font-medium transition-colors ${currentTab === 'music' ? 'border-b-2 border-purple-500 text-white' : 'text-gray-400 hover:text-white'}`}>
+            🎵 Music
+          </button>
           <button onClick={() => { setCurrentTab('results'); setNewResultsCount(0); }} className={`relative px-4 py-2 text-sm font-medium transition-colors ${currentTab === 'results' ? 'border-b-2 border-indigo-500 text-white' : 'text-gray-400 hover:text-white'}`}>
             Results
             {newResultsCount > 0 && (
@@ -622,7 +645,169 @@ IMAGE OUTPUT REQUIREMENTS:
       </div>
 
       <div className="w-full grow flex items-center justify-center overflow-y-auto">
-        {currentTab === 'setup' ? setupTab : (
+        {currentTab === 'setup' ? setupTab : currentTab === 'music' ? (
+          <div className="w-full max-w-4xl p-6 space-y-6">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold text-white mb-2">🎵 Music-Responsive Animator</h2>
+              <p className="text-gray-400">Create animations that dance to your music</p>
+            </div>
+
+            {/* Step 1: Upload Audio */}
+            <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
+              <h3 className="text-xl font-semibold text-white mb-4">Step 1: Add Music</h3>
+              {!loadedAudio ? (
+                <MusicUploader
+                  onAudioLoaded={(audio) => {
+                    setLoadedAudio(audio);
+                    // Initialize orchestrator
+                    if (!orchestratorRef.current) {
+                      orchestratorRef.current = new MusicAnimationOrchestrator();
+                    }
+                  }}
+                  onError={(error) => setError(error.message)}
+                />
+              ) : (
+                <AudioPlayer
+                  audio={loadedAudio}
+                  analyzer={orchestratorRef.current?.getAnalyzer()}
+                  showAnalysis={true}
+                  onRemove={() => {
+                    setLoadedAudio(null);
+                    setMusicTimeline(null);
+                    orchestratorRef.current?.dispose();
+                    orchestratorRef.current = null;
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Step 2: Choose Animation Style (only if audio loaded) */}
+            {loadedAudio && (
+              <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
+                <h3 className="text-xl font-semibold text-white mb-4">Step 2: Choose Style</h3>
+                <ChoreographyStyleSelector
+                  selectedStyle={choreographyStyle}
+                  intensity={musicIntensity}
+                  onStyleChange={setChoreographyStyle}
+                  onIntensityChange={setMusicIntensity}
+                />
+              </div>
+            )}
+
+            {/* Step 3: Set Duration (only if audio loaded) */}
+            {loadedAudio && (
+              <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
+                <h3 className="text-xl font-semibold text-white mb-4">Step 3: Set Duration</h3>
+                <DurationSelector
+                  selectedDuration={clipDuration}
+                  audioDuration={loadedAudio.metadata.duration}
+                  onDurationChange={setClipDuration}
+                />
+              </div>
+            )}
+
+            {/* Generate Button */}
+            {loadedAudio && animationRequests.length > 0 && (
+              <div className="text-center">
+                <button
+                  onClick={async () => {
+                    if (!orchestratorRef.current) return;
+
+                    setIsMusicProcessing(true);
+                    try {
+                      // Get the first animation request's generated frames
+                      const firstRequest = animationRequests[0];
+                      const completed = completedAnimations.find(
+                        a => a.sourceImageName === firstRequest.sourceImage.name
+                      );
+
+                      if (!completed || !completed.frames || completed.frames.length === 0) {
+                        setError('Please generate animation frames first in the Setup tab');
+                        return;
+                      }
+
+                      // Generate music-responsive timeline
+                      const timeline = await orchestratorRef.current.generateAnimation(
+                        {
+                          audio: loadedAudio,
+                          frames: completed.frames.map(f => f.dataUrl),
+                          anchorFrameCount: Math.ceil(completed.frames.length / 2),
+                          style: choreographyStyle,
+                          intensity: musicIntensity,
+                          duration: clipDuration,
+                          fps: 12
+                        },
+                        setMusicProcessingProgress
+                      );
+
+                      setMusicTimeline(timeline);
+                    } catch (err) {
+                      setError((err as Error).message);
+                    } finally {
+                      setIsMusicProcessing(false);
+                      setMusicProcessingProgress(null);
+                    }
+                  }}
+                  disabled={isMusicProcessing}
+                  className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-700 disabled:to-gray-700 text-white font-semibold rounded-xl transition-all transform hover:scale-105 disabled:scale-100"
+                >
+                  {isMusicProcessing ? '🎵 Creating Magic...' : '✨ Generate Music Animation'}
+                </button>
+                {musicProcessingProgress && (
+                  <p className="text-sm text-gray-400 mt-3">{musicProcessingProgress.message}</p>
+                )}
+              </div>
+            )}
+
+            {/* Info Message */}
+            {loadedAudio && animationRequests.length === 0 && (
+              <div className="text-center p-6 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                <p className="text-blue-400">
+                  👉 First, go to the <strong>Setup</strong> tab and generate animation frames for your image.
+                  Then come back here to sync them with music!
+                </p>
+              </div>
+            )}
+
+            {/* Preview (only if timeline generated) */}
+            {musicTimeline && loadedAudio && (
+              <>
+                <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
+                  <h3 className="text-xl font-semibold text-white mb-4">🎬 Preview</h3>
+                  <MusicResponsePlayer
+                    audio={loadedAudio}
+                    timeline={musicTimeline}
+                    analyzer={orchestratorRef.current?.getAnalyzer()}
+                    showAnalysis={true}
+                  />
+                </div>
+
+                {/* Export Button */}
+                <div className="text-center">
+                  <button
+                    onClick={() => setShowVideoExportModal(true)}
+                    className="px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-lg"
+                  >
+                    💾 Export Video with Audio
+                  </button>
+                  <p className="text-xs text-gray-500 mt-3">
+                    Download your music-responsive animation as MP4 or WebM
+                  </p>
+                </div>
+
+                {/* Video Export Modal */}
+                {showVideoExportModal && (
+                  <VideoExportModal
+                    timeline={musicTimeline}
+                    audio={loadedAudio}
+                    projectName={animationRequests[0]?.sourceImage.name.replace(/\.[^/.]+$/, '')}
+                    onClose={() => setShowVideoExportModal(false)}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        ) : (
           <BatchResultsView
             completed={completedAnimations}
             failed={failedImages}
