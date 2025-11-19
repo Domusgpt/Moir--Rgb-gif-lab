@@ -20,6 +20,7 @@ import { AudioPlayer } from './components/AudioPlayer';
 import { ChoreographyStyleSelector } from './components/ChoreographyStyleSelector';
 import { DurationSelector } from './components/DurationSelector';
 import { MusicResponsePlayer } from './components/MusicResponsePlayer';
+import { VideoExportModal } from './components/VideoExportModal';
 import { MusicService, LoadedAudio } from './services/musicService';
 import { MusicAnimationOrchestrator, AnimationProgress } from './services/musicAnimationOrchestrator';
 import { FrameTimeline } from './services/frameChoreographer';
@@ -79,6 +80,7 @@ const App: React.FC = () => {
   const [musicTimeline, setMusicTimeline] = useState<FrameTimeline | null>(null);
   const [isMusicProcessing, setIsMusicProcessing] = useState(false);
   const [musicProcessingProgress, setMusicProcessingProgress] = useState<AnimationProgress | null>(null);
+  const [showVideoExportModal, setShowVideoExportModal] = useState(false);
   const orchestratorRef = useRef<MusicAnimationOrchestrator | null>(null);
 
   const [animationRequests, setAnimationRequests] = useState<AnimationRequest[]>([]);
@@ -769,15 +771,40 @@ IMAGE OUTPUT REQUIREMENTS:
 
             {/* Preview (only if timeline generated) */}
             {musicTimeline && loadedAudio && (
-              <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
-                <h3 className="text-xl font-semibold text-white mb-4">🎬 Preview</h3>
-                <MusicResponsePlayer
-                  audio={loadedAudio}
-                  timeline={musicTimeline}
-                  analyzer={orchestratorRef.current?.getAnalyzer()}
-                  showAnalysis={true}
-                />
-              </div>
+              <>
+                <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
+                  <h3 className="text-xl font-semibold text-white mb-4">🎬 Preview</h3>
+                  <MusicResponsePlayer
+                    audio={loadedAudio}
+                    timeline={musicTimeline}
+                    analyzer={orchestratorRef.current?.getAnalyzer()}
+                    showAnalysis={true}
+                  />
+                </div>
+
+                {/* Export Button */}
+                <div className="text-center">
+                  <button
+                    onClick={() => setShowVideoExportModal(true)}
+                    className="px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-lg"
+                  >
+                    💾 Export Video with Audio
+                  </button>
+                  <p className="text-xs text-gray-500 mt-3">
+                    Download your music-responsive animation as MP4 or WebM
+                  </p>
+                </div>
+
+                {/* Video Export Modal */}
+                {showVideoExportModal && (
+                  <VideoExportModal
+                    timeline={musicTimeline}
+                    audio={loadedAudio}
+                    projectName={animationRequests[0]?.sourceImage.name.replace(/\.[^/.]+$/, '')}
+                    onClose={() => setShowVideoExportModal(false)}
+                  />
+                )}
+              </>
             )}
           </div>
         ) : (
