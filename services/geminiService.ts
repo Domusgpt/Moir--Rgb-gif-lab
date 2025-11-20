@@ -7,8 +7,20 @@
 
 import { GoogleGenAI, GenerateContentResponse, Modality } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lazy initialization to prevent crashes when API key is missing
+let ai: GoogleGenAI | null = null;
 const imageModel = 'gemini-2.5-flash-image';
+
+function getAI(): GoogleGenAI {
+  if (!ai) {
+    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('Gemini API key is not configured. Please add GEMINI_API_KEY to your environment variables or GitHub Secrets.');
+    }
+    ai = new GoogleGenAI({ apiKey });
+  }
+  return ai;
+}
 
 export interface AnimationAssets {
   sourceImageId: string;
@@ -48,7 +60,7 @@ export const generateAnimationAssets = async (
     }
     parts.push(imageGenTextPart);
     
-    const imageGenResponse: GenerateContentResponse = await ai.models.generateContent({
+    const imageGenResponse: GenerateContentResponse = await getAI().models.generateContent({
         model: imageModel,
         contents: [{
             role: "user",
